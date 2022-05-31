@@ -1,16 +1,18 @@
 use {
     anyhow::Result,
     std::{
+        cmp::Ordering,
         env, fs,
         io::{self, prelude::*},
     },
 };
 
 mod reader;
+mod value;
 
 fn run(source: &str) -> Result<()> {
-    for token in reader::Tokens::new(source) {
-        println!("{:?}", token?);
+    for value in reader::Reader::new(source) {
+        println!("{}", value?);
     }
     Ok(())
 }
@@ -38,12 +40,12 @@ fn run_repl() -> Result<()> {
 
 fn main() -> Result<()> {
     let args: Vec<_> = env::args().collect();
-    if args.len() > 2 {
-        println!("Usage: {} [script]", args[0]);
-        Ok(())
-    } else if args.len() == 2 {
-        run_file(&args[1])
-    } else {
-        run_repl()
+    match args.len().cmp(&2) {
+        Ordering::Less => run_repl(),
+        Ordering::Equal => run_file(&args[1]),
+        Ordering::Greater => {
+            println!("Usage: {} [script]", args[0]);
+            Ok(())
+        }
     }
 }

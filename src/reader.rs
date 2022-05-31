@@ -1,7 +1,11 @@
-use anyhow::{bail, Result};
+use {
+    crate::value::Value,
+    anyhow::{bail, Result},
+    std::{iter, str},
+};
 
-#[derive(Debug)]
-pub enum TokenData<'a> {
+#[derive(Debug, PartialEq)]
+enum TokenData<'a> {
     LeftParen,
     RightParen,
     Int(i32),
@@ -9,64 +13,57 @@ pub enum TokenData<'a> {
 }
 
 #[derive(Debug)]
-pub struct Token<'a> {
+struct Token<'a> {
     data: TokenData<'a>,
     offset: usize,
-    len: usize,
 }
 
-fn is_symbolic(c: char) -> bool {
-    c.is_alphanumeric()
-        || c == '*'
-        || c == '+'
-        || c == '!'
-        || c == '-'
-        || c == '_'
-        || c == '\''
-        || c == '?'
-        || c == '<'
-        || c == '>'
-        || c == '='
-}
-
-pub struct Tokens<'a> {
+struct Tokens<'a> {
     source: &'a str,
-    offset: usize,
+    chars: iter::Peekable<str::CharIndices<'a>>,
 }
 
 impl<'a> Tokens<'a> {
-    pub fn new(source: &'a str) -> Tokens<'a> {
-        Tokens { source, offset: 0 }
+    fn new(source: &'a str) -> Tokens<'a> {
+        Tokens {
+            source,
+            chars: source.char_indices().peekable(),
+        }
     }
 
-    fn read_int(&self) -> Result<Token<'a>> {
-        let mut len = 0;
-        for c in self.source[self.offset..].chars() {
-            if !(c.is_ascii_digit() || c == '-' || c == '+') {
-                break;
-            }
-            len += c.len_utf8();
+    // byte index of end of current char (exclusive)
+    fn end(&mut self) -> usize {
+        match self.chars.peek() {
+            Some((offset, _)) => *offset,
+            None => self.source.len(),
+        }
+    }
+
+    fn next_char_is<F>(&mut self, mut f: F) -> bool
+    where
+        F: FnMut(char) -> bool,
+    {
+        self.chars.peek().map_or(false, |(_, c)| f(*c))
+    }
+
+    fn read_int(&mut self, offset: usize) -> Result<Token<'a>> {
+        while self.next_char_is(|c| c.is_ascii_digit()) {
+            self.chars.next();
         }
         Ok(Token {
-            data: TokenData::Int(self.source[self.offset..self.offset + len].parse()?),
-            offset: self.offset,
-            len,
+            data: TokenData::Int(self.source[offset..self.end()].parse()?),
+            offset,
         })
     }
 
-    fn read_symbol(&self) -> Result<Token<'a>> {
-        let mut len = 0;
-        for c in self.source[self.offset..].chars() {
-            if !is_symbolic(c) {
-                break;
-            }
-            len += c.len_utf8();
+    fn read_symbol(&mut self, offset: usize) -> Token<'a> {
+        while self.next_char_is(is_symbolic) {
+            self.chars.next();
         }
-        Ok(Token {
-            data: TokenData::Symbol(&self.source[self.offset..self.offset + len]),
-            offset: self.offset,
-            len,
-        })
+        Token {
+            data: TokenData::Symbol(&self.source[offset..self.end()]),
+            offset,
+        }
     }
 }
 
@@ -74,68 +71,92 @@ impl<'a> Iterator for Tokens<'a> {
     type Item = Result<Token<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for c in self.source[self.offset..].chars() {
-            if c.is_whitespace() {
-                self.offset += c.len_utf8();
-            } else {
-                break;
-            }
+        while self.next_char_is(|c| c.is_whitespace()) {
+            self.chars.next();
         }
-        self.source[self.offset..].chars().next().map(|c| {
-            let token = match c {
+        self.chars.next().map(|(offset, c)| {
+            Ok(match c {
                 '(' => Token {
                     data: TokenData::LeftParen,
-                    offset: self.offset,
-                    len: 1,
+                    offset,
                 },
                 ')' => Token {
                     data: TokenData::RightParen,
-                    offset: self.offset,
-                    len: 1,
+                    offset,
                 },
-                c if c.is_ascii_digit() || c == '-' || c == '+' => self.read_int()?,
-                c if is_symbolic(c) => self.read_symbol()?,
-                c => bail!("unexpected character {} at offset {}", c, self.offset),
-            };
-            self.offset = token.offset + token.len;
-            Ok(token)
+                c if c.is_ascii_digit()
+                    || (c == '-' || c == '+') && self.next_char_is(|c| c.is_ascii_digit()) =>
+                {
+                    self.read_int(offset)?
+                }
+                c if is_symbolic(c) => self.read_symbol(offset),
+                c => bail!(
+                    "unexpected character '{}' on line {}",
+                    c,
+                    line_no(self.source, offset),
+                ),
+            })
         })
     }
 }
 
-struct Reader<'a> {
-    tokens: Tokens<'a>,
+pub struct Reader<'a> {
+    source: &'a str,
+    tokens: iter::Peekable<Tokens<'a>>,
 }
 
 impl<'a> Reader<'a> {
-    fn new(source: &'a str) -> Reader<'a> {
+    pub fn new(source: &'a str) -> Reader<'a> {
         Reader {
-            tokens: Tokens::new(source),
+            source,
+            tokens: Tokens::new(source).peekable(),
         }
+    }
+
+    fn next_token_is(&mut self, data: TokenData) -> bool {
+        self.tokens
+            .peek()
+            .map_or(false, |t| t.as_ref().map_or(false, |t| t.data == data))
     }
 }
 
 impl<'a> Iterator for Reader<'a> {
-    type Item = Result<Form<'a>>;
+    type Item = Result<Value>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.tokens.next().map(|token| {
             let token = token?;
-            let form = match token.data {
+            Ok(match token.data {
+                TokenData::Int(int) => Value::Int(int),
+                TokenData::Symbol(symbol) => Value::Symbol(symbol.to_string()),
                 TokenData::LeftParen => {
-                    todo!()
+                    let mut list = Vec::new();
+                    while !self.next_token_is(TokenData::RightParen) {
+                        if let Some(value) = self.next() {
+                            list.push(value?);
+                        } else {
+                            bail!("unexpected end of input")
+                        }
+                    }
+                    self.tokens.next();
+                    Value::List(list)
                 }
                 TokenData::RightParen => {
-                    bail!("unexpected closing parenthesis at offset {}", token.offset)
+                    bail!(
+                        "unmatched closing parenthesis on line {}",
+                        line_no(self.source, token.offset),
+                    )
                 }
-                TokenData::Int(int) => Form {
-                    data: FormData::Int(int),
-                },
-                TokenData::Symbol(symbol) => Form {
-                    data: FormData::Symbol(symbol),
-                },
-            };
-            Ok(token)
+            })
         })
     }
+}
+
+fn is_symbolic(c: char) -> bool {
+    c.is_alphanumeric() || "*+!-_'?<>=".contains(c)
+}
+
+// The line number of offset in the given source; 1 indexed
+fn line_no(source: &str, offset: usize) -> usize {
+    source[..offset].chars().filter(|c| *c == '\n').count() + 1
 }
