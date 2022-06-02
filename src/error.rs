@@ -49,6 +49,14 @@ impl std::error::Error for Error {
     }
 }
 
+pub fn report(mut err: &(dyn std::error::Error)) {
+    eprintln!("error: {}", err);
+    while let Some(e) = err.source() {
+        err = e;
+        eprintln!("caused by: {}", err);
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 // The line number of offset in the given source; 1 indexed

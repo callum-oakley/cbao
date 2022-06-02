@@ -3,12 +3,10 @@ mod reader;
 mod value;
 
 use {
-    error::Result,
+    error::{Error, Result},
     std::{
         cmp::Ordering,
-        env,
-        error::Error,
-        fs,
+        env, fs,
         io::{self, prelude::*},
     },
 };
@@ -25,17 +23,30 @@ fn run_file(path: &str) -> Result<()> {
 }
 
 fn prompt() -> Result<()> {
-    print!("\n> ");
+    print!("> ");
     io::stdout().flush()?;
     Ok(())
 }
 
 fn run_repl() -> Result<()> {
+    let mut input = String::new();
+    println!();
     prompt()?;
     for line in io::stdin().lock().lines() {
-        if let Err(err) = run_source(&line?) {
-            eprintln!("Error: {:?}", err);
-        }
+        input += &line?;
+        match run_source(&input) {
+            Err(Error::UnexpectedEof) => {
+                input.push('\n');
+                prompt()?;
+                continue;
+            }
+            Err(err) => {
+                error::report(&err);
+            }
+            Ok(()) => {}
+        };
+        input.clear();
+        println!();
         prompt()?;
     }
     Ok(())
@@ -55,12 +66,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(err) = run() {
-        eprintln!("error: {}", err);
-        let mut err: &(dyn Error) = &err;
-        while let Some(e) = err.source() {
-            err = e;
-            eprintln!("caused by: {}", err);
-        }
+        error::report(&err);
         std::process::exit(1);
     }
 }
