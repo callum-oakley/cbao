@@ -1,16 +1,19 @@
+mod error;
+mod reader;
+mod value;
+
 use {
-    anyhow::Result,
+    error::Result,
     std::{
         cmp::Ordering,
-        env, fs,
+        env,
+        error::Error,
+        fs,
         io::{self, prelude::*},
     },
 };
 
-mod reader;
-mod value;
-
-fn run(source: &str) -> Result<()> {
+fn run_source(source: &str) -> Result<()> {
     for value in reader::Reader::new(source) {
         println!("{}", value?);
     }
@@ -18,7 +21,7 @@ fn run(source: &str) -> Result<()> {
 }
 
 fn run_file(path: &str) -> Result<()> {
-    run(&fs::read_to_string(path)?)
+    run_source(&fs::read_to_string(path)?)
 }
 
 fn prompt() -> Result<()> {
@@ -30,7 +33,7 @@ fn prompt() -> Result<()> {
 fn run_repl() -> Result<()> {
     prompt()?;
     for line in io::stdin().lock().lines() {
-        if let Err(err) = run(&line?) {
+        if let Err(err) = run_source(&line?) {
             eprintln!("Error: {:?}", err);
         }
         prompt()?;
@@ -38,7 +41,7 @@ fn run_repl() -> Result<()> {
     Ok(())
 }
 
-fn main() -> Result<()> {
+fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
     match args.len().cmp(&2) {
         Ordering::Less => run_repl(),
@@ -47,5 +50,17 @@ fn main() -> Result<()> {
             println!("Usage: {} [script]", args[0]);
             Ok(())
         }
+    }
+}
+
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("error: {}", err);
+        let mut err: &(dyn Error) = &err;
+        while let Some(e) = err.source() {
+            err = e;
+            eprintln!("caused by: {}", err);
+        }
+        std::process::exit(1);
     }
 }

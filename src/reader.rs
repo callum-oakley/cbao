@@ -1,6 +1,8 @@
 use {
-    crate::value::Value,
-    anyhow::{bail, Result},
+    crate::{
+        error::{self, Error, Result},
+        value::Value,
+    },
     std::{iter, str},
 };
 
@@ -47,13 +49,20 @@ impl<'a> Tokens<'a> {
     }
 
     fn read_int(&mut self, offset: usize) -> Result<Token<'a>> {
-        while self.next_char_is(|c| c.is_ascii_digit()) {
+        while self.next_char_is(is_symbolic) {
             self.chars.next();
         }
-        Ok(Token {
-            data: TokenData::Int(self.source[offset..self.end()].parse()?),
-            offset,
-        })
+        self.source[offset..self.end()]
+            .parse()
+            .map(|int| Token {
+                data: TokenData::Int(int),
+                offset,
+            })
+            .map_err(|err| Error::ParseInt {
+                target: self.source[offset..self.end()].to_string(),
+                line_no: error::line_no(self.source, offset),
+                err,
+            })
     }
 
     fn read_symbol(&mut self, offset: usize) -> Token<'a> {
@@ -90,11 +99,12 @@ impl<'a> Iterator for Tokens<'a> {
                     self.read_int(offset)?
                 }
                 c if is_symbolic(c) => self.read_symbol(offset),
-                c => bail!(
-                    "unexpected character '{}' on line {}",
-                    c,
-                    line_no(self.source, offset),
-                ),
+                c => {
+                    return Err(Error::UnexpectedChar {
+                        target: c,
+                        line_no: error::line_no(self.source, offset),
+                    })
+                }
             })
         })
     }
@@ -135,17 +145,17 @@ impl<'a> Iterator for Reader<'a> {
                         if let Some(value) = self.next() {
                             list.push(value?);
                         } else {
-                            bail!("unexpected end of input")
+                            return Err(Error::UnexpectedEof);
                         }
                     }
                     self.tokens.next();
                     Value::List(list)
                 }
                 TokenData::RightParen => {
-                    bail!(
-                        "unmatched closing parenthesis on line {}",
-                        line_no(self.source, token.offset),
-                    )
+                    return Err(Error::UnexpectedChar {
+                        target: ')',
+                        line_no: error::line_no(self.source, token.offset),
+                    })
                 }
             })
         })
@@ -154,9 +164,4 @@ impl<'a> Iterator for Reader<'a> {
 
 fn is_symbolic(c: char) -> bool {
     c.is_alphanumeric() || "*+!-_'?<>=".contains(c)
-}
-
-// The line number of offset in the given source; 1 indexed
-fn line_no(source: &str, offset: usize) -> usize {
-    source[..offset].chars().filter(|c| *c == '\n').count() + 1
 }
