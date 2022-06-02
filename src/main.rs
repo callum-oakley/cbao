@@ -5,7 +5,6 @@ mod value;
 use {
     error::{Error, Result},
     std::{
-        cmp::Ordering,
         env, fs,
         io::{self, prelude::*},
     },
@@ -54,13 +53,11 @@ fn run_repl() -> Result<()> {
 
 fn run() -> Result<()> {
     let args: Vec<_> = env::args().collect();
-    match args.len().cmp(&2) {
-        Ordering::Less => run_repl(),
-        Ordering::Equal => run_file(&args[1]),
-        Ordering::Greater => {
-            println!("Usage: {} [script]", args[0]);
-            Ok(())
-        }
+    match args.len() {
+        1 => run_repl(),
+        2 => run_file(&args[1]),
+        // assumes -e <form> for now
+        _ => run_source(&args[2]),
     }
 }
 
