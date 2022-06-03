@@ -1,4 +1,4 @@
-use std::fmt;
+use {crate::value::Value, std::fmt};
 
 #[derive(Debug)]
 pub enum Error {
@@ -13,6 +13,13 @@ pub enum Error {
         line_no: usize,
     },
     UnexpectedEof,
+    // TODO line numbers and extra context for the below
+    UnknownSymbol {
+        target: String,
+    },
+    NotFn {
+        target: Value,
+    },
 }
 
 impl From<std::io::Error> for Error {
@@ -35,6 +42,8 @@ impl std::fmt::Display for Error {
                 write!(f, "unexpected char '{target}' on line {line_no}")
             }
             Error::UnexpectedEof => write!(f, "unexpected end of input"),
+            Error::UnknownSymbol { target } => write!(f, "unknown symbol {target}"),
+            Error::NotFn { target } => write!(f, "{target} is not a function"),
         }
     }
 }

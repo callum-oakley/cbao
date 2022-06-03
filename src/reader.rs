@@ -3,7 +3,7 @@ use {
         error::{self, Error, Result},
         value::Value,
     },
-    std::{iter, str},
+    std::{iter, rc::Rc, str},
 };
 
 #[derive(Debug, PartialEq)]
@@ -11,7 +11,7 @@ enum TokenData<'a> {
     LeftParen,
     RightParen,
     Int(i32),
-    Symbol(&'a str),
+    Sym(&'a str),
 }
 
 #[derive(Debug)]
@@ -70,7 +70,7 @@ impl<'a> Tokens<'a> {
             self.chars.next();
         }
         Token {
-            data: TokenData::Symbol(&self.source[offset..self.end()]),
+            data: TokenData::Sym(&self.source[offset..self.end()]),
             offset,
         }
     }
@@ -110,19 +110,12 @@ impl<'a> Iterator for Tokens<'a> {
     }
 }
 
-pub struct Reader<'a> {
+struct Reader<'a> {
     source: &'a str,
     tokens: iter::Peekable<Tokens<'a>>,
 }
 
 impl<'a> Reader<'a> {
-    pub fn new(source: &'a str) -> Reader<'a> {
-        Reader {
-            source,
-            tokens: Tokens::new(source).peekable(),
-        }
-    }
-
     fn next_token_is(&mut self, data: TokenData) -> bool {
         self.tokens
             .peek()
@@ -138,7 +131,7 @@ impl<'a> Iterator for Reader<'a> {
             let token = token?;
             Ok(match token.data {
                 TokenData::Int(int) => Value::Int(int),
-                TokenData::Symbol(symbol) => Value::Symbol(symbol.to_string()),
+                TokenData::Sym(sym) => Value::Sym(sym.to_string()),
                 TokenData::LeftParen => {
                     let mut list = Vec::new();
                     while !self.next_token_is(TokenData::RightParen) {
@@ -149,7 +142,7 @@ impl<'a> Iterator for Reader<'a> {
                         }
                     }
                     self.tokens.next();
-                    Value::List(list)
+                    Value::List(Rc::new(list))
                 }
                 TokenData::RightParen => {
                     return Err(Error::UnexpectedChar {
@@ -163,5 +156,12 @@ impl<'a> Iterator for Reader<'a> {
 }
 
 fn is_symbolic(c: char) -> bool {
-    c.is_alphanumeric() || "*+!-_'?<>=".contains(c)
+    c.is_alphanumeric() || "*+!-_'?<>=/".contains(c)
+}
+
+pub fn read(source: &str) -> impl Iterator<Item = Result<Value>> + '_ {
+    Reader {
+        source,
+        tokens: Tokens::new(source).peekable(),
+    }
 }

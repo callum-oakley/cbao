@@ -1,5 +1,6 @@
 mod error;
 mod reader;
+mod runtime;
 mod value;
 
 use {
@@ -11,8 +12,9 @@ use {
 };
 
 fn run_source(source: &str) -> Result<()> {
-    for value in reader::Reader::new(source) {
-        println!("{}", value?);
+    let prelude = runtime::prelude();
+    for value in reader::read(source) {
+        println!("{}", runtime::eval(value?, &prelude)?);
     }
     Ok(())
 }

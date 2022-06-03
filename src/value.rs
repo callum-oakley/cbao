@@ -1,17 +1,26 @@
-use std::fmt;
+use std::{fmt, rc::Rc};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum Primitive {
+    Plus,
+    Minus,
+    Star,
+    Slash,
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
     Int(i32),
-    Symbol(String),
-    List(Vec<Value>),
+    Sym(String),
+    List(Rc<Vec<Value>>),
+    Primitive(Primitive),
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Int(int) => write!(f, "{}", int),
-            Value::Symbol(sym) => write!(f, "{}", sym),
+            Value::Sym(sym) => write!(f, "{}", sym),
             Value::List(list) => {
                 let mut list = list.iter();
                 write!(f, "(")?;
@@ -23,6 +32,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
+            Value::Primitive(p) => write!(f, "(primitive {:?})", p),
         }
     }
 }
