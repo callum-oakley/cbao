@@ -85,6 +85,12 @@ impl<'a> Iterator for Tokens<'a> {
         while self.next_char_is(|c| c.is_whitespace()) {
             self.chars.next();
         }
+        if self.next_char_is(|c| c == ';') {
+            while !self.next_char_is(|c| c == '\n') {
+                self.chars.next();
+            }
+            return self.next();
+        }
         self.chars.next().map(|(offset, c)| {
             Ok(match c {
                 '(' => Token {

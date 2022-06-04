@@ -40,6 +40,21 @@ fn eval_fn(args: &[Value], env: &Env) -> Result<Value> {
     }
 }
 
+fn eval_if(args: &[Value], env: &Env) -> Result<Value> {
+    if args.len() != 3 {
+        Err(Error::Arity {
+            target: "if".to_string(),
+            n: args.len(),
+        })
+    } else {
+        if eval(args[0].clone(), env)?.truthy() {
+            eval(args[1].clone(), env)
+        } else {
+            eval(args[2].clone(), env)
+        }
+    }
+}
+
 pub fn eval(value: Value, env: &Env) -> Result<Value> {
     match value {
         Value::Sym(sym) => match env.get(&sym) {
@@ -54,6 +69,7 @@ pub fn eval(value: Value, env: &Env) -> Result<Value> {
                 match sym.as_str() {
                     "def" => return eval_def(&list[1..], env),
                     "fn" => return eval_fn(&list[1..], env),
+                    "if" => return eval_if(&list[1..], env),
                     _ => (),
                 }
             }
@@ -138,20 +154,24 @@ impl Apply for Closure {
 impl Apply for Primitive {
     fn apply(&self, args: Vec<Value>) -> Result<Value> {
         let args: Vec<i32> = args.into_iter().map(unwrap_int).collect();
-        Ok(Value::Int(match self {
-            Primitive::Plus => args.iter().sum(),
-            Primitive::Star => args.iter().product(),
-            Primitive::Minus => match args.len() {
+        Ok(match self {
+            Primitive::Plus => Value::Int(args.iter().sum()),
+            Primitive::Star => Value::Int(args.iter().product()),
+            Primitive::Minus => Value::Int(match args.len() {
                 0 => 0,
                 1 => -args[0],
                 _ => args[0] - args[1..].iter().sum::<i32>(),
-            },
+            }),
             // TODO this should return a ratio
-            Primitive::Slash => match args.len() {
+            Primitive::Slash => Value::Int(match args.len() {
                 0 => 1,
                 1 => 1 / args[0],
                 _ => args[0] / args[1..].iter().product::<i32>(),
-            },
-        }))
+            }),
+            Primitive::Eq => Value::Bool(match args.len() {
+                0 => true,
+                _ => args[1..].iter().all(|v| *v == args[0]),
+            }),
+        })
     }
 }

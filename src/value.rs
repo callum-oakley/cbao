@@ -6,6 +6,7 @@ pub enum Primitive {
     Minus,
     Star,
     Slash,
+    Eq,
 }
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub struct Closure {
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
+    Bool(bool),
     Int(i32),
     Sym(String),
     List(Rc<Vec<Value>>),
@@ -26,10 +28,20 @@ pub enum Value {
     Primitive(Primitive),
 }
 
+impl Value {
+    pub fn truthy(&self) -> bool {
+        match self {
+            Value::Nil | Value::Bool(false) => false,
+            _ => true,
+        }
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Nil => write!(f, "nil"),
+            Value::Bool(bool) => write!(f, "{}", bool),
             Value::Int(int) => write!(f, "{}", int),
             Value::Sym(sym) => write!(f, "{}", sym),
             Value::List(list) => write_coll(f, "(", list.iter().cloned(), ")"),
@@ -55,10 +67,14 @@ impl Env {
             frame: HashMap::new(),
             outer: None,
         })));
+        env.set("nil".to_string(), Value::Nil);
+        env.set("true".to_string(), Value::Bool(true));
+        env.set("false".to_string(), Value::Bool(false));
         env.set("+".to_string(), Value::Primitive(Primitive::Plus));
         env.set("*".to_string(), Value::Primitive(Primitive::Star));
         env.set("-".to_string(), Value::Primitive(Primitive::Minus));
         env.set("/".to_string(), Value::Primitive(Primitive::Slash));
+        env.set("=".to_string(), Value::Primitive(Primitive::Eq));
         env
     }
 
