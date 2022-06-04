@@ -1,20 +1,22 @@
+mod env;
 mod error;
 mod reader;
 mod runtime;
 mod value;
 
 use {
+    env::Env,
     error::{Error, Result},
     std::{
-        env, fs,
+        fs,
         io::{self, prelude::*},
     },
 };
 
 fn run_source(source: &str) -> Result<()> {
-    let prelude = runtime::prelude();
+    let mut prelude = Env::prelude();
     for value in reader::read(source) {
-        println!("{}", runtime::eval(value?, &prelude)?);
+        println!("{}", runtime::eval(value?, &mut prelude)?);
     }
     Ok(())
 }
@@ -44,7 +46,7 @@ fn run_repl() -> Result<()> {
             Err(err) => {
                 error::report(&err);
             }
-            Ok(()) => {}
+            Ok(()) => (),
         };
         input.clear();
         println!();
@@ -54,7 +56,7 @@ fn run_repl() -> Result<()> {
 }
 
 fn run() -> Result<()> {
-    let args: Vec<_> = env::args().collect();
+    let args: Vec<_> = std::env::args().collect();
     match args.len() {
         1 => run_repl(),
         2 => run_file(&args[1]),

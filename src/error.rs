@@ -20,6 +20,10 @@ pub enum Error {
     NotFn {
         target: Value,
     },
+    Arity {
+        target: String,
+        n: usize,
+    },
 }
 
 impl From<std::io::Error> for Error {
@@ -44,6 +48,7 @@ impl std::fmt::Display for Error {
             Error::UnexpectedEof => write!(f, "unexpected end of input"),
             Error::UnknownSymbol { target } => write!(f, "unknown symbol {target}"),
             Error::NotFn { target } => write!(f, "{target} is not a function"),
+            Error::Arity { target, n } => write!(f, "can't apply {target} to {n} arguments"),
         }
     }
 }

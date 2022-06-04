@@ -1,23 +1,23 @@
-use {
-    crate::{
-        error::{Error, Result},
-        value::{Primitive, Value},
-    },
-    std::collections::HashMap,
+use crate::{
+    env::Env,
+    error::{Error, Result},
+    value::{Primitive, Value},
 };
 
-pub type Env = HashMap<String, Value>;
-
-pub fn prelude() -> Env {
-    let mut env = HashMap::new();
-    env.insert("+".to_string(), Value::Primitive(Primitive::Plus));
-    env.insert("*".to_string(), Value::Primitive(Primitive::Star));
-    env.insert("-".to_string(), Value::Primitive(Primitive::Minus));
-    env.insert("/".to_string(), Value::Primitive(Primitive::Slash));
-    env
+fn eval_def(args: &[Value], env: &mut Env) -> Result<Value> {
+    if args.len() != 2 {
+        Err(Error::Arity {
+            target: "def".to_string(),
+            n: args.len(),
+        })
+    } else {
+        let value = eval(args[1].clone(), env)?;
+        env.set(unwrap_sym(args[0].clone()), value);
+        Ok(Value::Nil)
+    }
 }
 
-pub fn eval(value: Value, env: &Env) -> Result<Value> {
+pub fn eval(value: Value, env: &mut Env) -> Result<Value> {
     match value {
         Value::Sym(sym) => match env.get(&sym) {
             Some(v) => Ok(v.clone()),
@@ -25,16 +25,21 @@ pub fn eval(value: Value, env: &Env) -> Result<Value> {
         },
         Value::List(ref list) => {
             if list.is_empty() {
-                Ok(value.clone())
-            } else {
-                apply(
-                    eval(list[0].clone(), env)?,
-                    list[1..]
-                        .iter()
-                        .map(|v| eval(v.clone(), env))
-                        .collect::<Result<_>>()?,
-                )
+                return Ok(value.clone());
             }
+            if let Value::Sym(sym) = &list[0] {
+                match sym.as_str() {
+                    "def" => return eval_def(&list[1..], env),
+                    _ => (),
+                }
+            }
+            apply(
+                eval(list[0].clone(), env)?,
+                list[1..]
+                    .iter()
+                    .map(|v| eval(v.clone(), env))
+                    .collect::<Result<_>>()?,
+            )
         }
         _ => Ok(value),
     }
@@ -58,6 +63,15 @@ trait Apply {
 fn unwrap_int(value: Value) -> i32 {
     match value {
         Value::Int(int) => int,
+        _ => todo!(),
+    }
+}
+
+// TODO at some point we have to check types and unwrap them to apply primitives, I haven't decided
+// where yet.
+fn unwrap_sym(value: Value) -> String {
+    match value {
+        Value::Sym(sym) => sym,
         _ => todo!(),
     }
 }
