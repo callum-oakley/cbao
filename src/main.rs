@@ -1,22 +1,21 @@
-mod env;
 mod error;
 mod reader;
 mod runtime;
 mod value;
 
 use {
-    env::Env,
     error::{Error, Result},
     std::{
         fs,
         io::{self, prelude::*},
     },
+    value::Env,
 };
 
 fn run_source(source: &str) -> Result<()> {
-    let mut prelude = Env::prelude();
+    let prelude = Env::prelude();
     for value in reader::read(source) {
-        println!("{}", runtime::eval(value?, &mut prelude)?);
+        println!("{}", runtime::eval(value?, &prelude)?);
     }
     Ok(())
 }

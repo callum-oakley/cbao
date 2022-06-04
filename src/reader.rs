@@ -10,6 +10,8 @@ use {
 enum TokenData<'a> {
     LeftParen,
     RightParen,
+    LeftSquare,
+    RightSquare,
     Int(i32),
     Sym(&'a str),
 }
@@ -93,6 +95,14 @@ impl<'a> Iterator for Tokens<'a> {
                     data: TokenData::RightParen,
                     offset,
                 },
+                '[' => Token {
+                    data: TokenData::LeftSquare,
+                    offset,
+                },
+                ']' => Token {
+                    data: TokenData::RightSquare,
+                    offset,
+                },
                 c if c.is_ascii_digit()
                     || (c == '-' || c == '+') && self.next_char_is(|c| c.is_ascii_digit()) =>
                 {
@@ -132,6 +142,7 @@ impl<'a> Iterator for Reader<'a> {
             Ok(match token.data {
                 TokenData::Int(int) => Value::Int(int),
                 TokenData::Sym(sym) => Value::Sym(sym.to_string()),
+                // TODO DRY
                 TokenData::LeftParen => {
                     let mut list = Vec::new();
                     while !self.next_token_is(TokenData::RightParen) {
@@ -147,6 +158,24 @@ impl<'a> Iterator for Reader<'a> {
                 TokenData::RightParen => {
                     return Err(Error::UnexpectedChar {
                         target: ')',
+                        line_no: error::line_no(self.source, token.offset),
+                    })
+                }
+                TokenData::LeftSquare => {
+                    let mut vec = Vec::new();
+                    while !self.next_token_is(TokenData::RightSquare) {
+                        if let Some(value) = self.next() {
+                            vec.push(value?);
+                        } else {
+                            return Err(Error::UnexpectedEof);
+                        }
+                    }
+                    self.tokens.next();
+                    Value::Vec(Rc::new(vec))
+                }
+                TokenData::RightSquare => {
+                    return Err(Error::UnexpectedChar {
+                        target: ']',
                         line_no: error::line_no(self.source, token.offset),
                     })
                 }
