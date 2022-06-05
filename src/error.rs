@@ -1,79 +1,97 @@
-use {crate::value::Value, std::fmt};
+use {
+    crate::value::{Meta, Value},
+    std::fmt,
+};
 
 #[derive(Debug)]
-pub enum Error {
+pub enum ErrorData {
     IO(std::io::Error),
-    ParseInt {
-        target: String,
-        line_no: usize,
-        err: std::num::ParseIntError,
-    },
-    UnexpectedChar {
-        target: char,
-        line_no: usize,
-    },
+    ParseInt(String, std::num::ParseIntError),
+    UnexpectedChar(char),
     UnexpectedEof,
-    // TODO line numbers and extra context for the below
-    UnknownSymbol {
-        target: String,
-    },
-    NotFn {
-        target: Value,
-    },
-    Arity {
-        target: String,
-        n: usize,
-    },
+    UnknownSym(String),
+    Apply(Value),
+    Type(Value, String),
+    Todo,
+}
+
+#[derive(Debug)]
+pub struct Error {
+    pub data: ErrorData,
+    meta: Meta,
+    source: Option<Box<Error>>,
+}
+
+impl Error {
+    pub fn new(data: ErrorData) -> Error {
+        Error {
+            data,
+            meta: Meta { line_no: None },
+            source: None,
+        }
+    }
+
+    pub fn with(self, meta: Meta) -> Error {
+        Error {
+            data: self.data,
+            meta,
+            source: self.source,
+        }
+    }
+
+    pub fn wrap(self, data: ErrorData) -> Error {
+        Error {
+            data,
+            meta: Meta { line_no: None },
+            source: Some(Box::new(self)),
+        }
+    }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
-        Error::IO(err)
+        Error::new(ErrorData::IO(err))
     }
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::IO(err) => err.fmt(f),
-            Error::ParseInt {
-                target, line_no, ..
-            } => write!(
-                f,
-                "failed to parse \"{target}\" as an int on line {line_no}"
-            ),
-            Error::UnexpectedChar { target, line_no } => {
-                write!(f, "unexpected char '{target}' on line {line_no}")
-            }
-            Error::UnexpectedEof => write!(f, "unexpected end of input"),
-            Error::UnknownSymbol { target } => write!(f, "unknown symbol {target}"),
-            Error::NotFn { target } => write!(f, "{target} is not a function"),
-            Error::Arity { target, n } => write!(f, "can't apply {target} to {n} arguments"),
+        match &self.data {
+            ErrorData::IO(err) => err.fmt(f),
+            ErrorData::ParseInt(s, _) => write!(f, "failed to parse '{s}' as an Int"),
+            ErrorData::UnexpectedChar(c) => write!(f, "unexpected char '{c}'"),
+            ErrorData::UnexpectedEof => write!(f, "unexpected end of input"),
+            ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
+            ErrorData::Apply(value) => write!(f, "in '{value}'"),
+            ErrorData::Type(value, t) => write!(f, "type error: '{value}' is not {t}"),
+            ErrorData::Todo => write!(f, "TODO"),
+        }?;
+        if let Some(line_no) = self.meta.line_no {
+            write!(f, " (line {line_no})")?;
         }
+        Ok(())
     }
 }
 
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Error::IO(err) => Some(err),
-            Error::ParseInt { err, .. } => Some(err),
-            _ => None,
+        match &self.source {
+            Some(err) => Some(err.as_ref()),
+            None => match &self.data {
+                ErrorData::IO(err) => Some(err),
+                ErrorData::ParseInt(_, err) => Some(err),
+                _ => None,
+            },
         }
     }
 }
 
 pub fn report(mut err: &(dyn std::error::Error)) {
-    eprintln!("error: {}", err);
+    eprintln!("{}", err);
     while let Some(e) = err.source() {
         err = e;
-        eprintln!("caused by: {}", err);
+        eprintln!("{}", err);
     }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-
-// The line number of offset in the given source; 1 indexed
-pub fn line_no(source: &str, offset: usize) -> usize {
-    source[..offset].chars().filter(|c| *c == '\n').count() + 1
-}

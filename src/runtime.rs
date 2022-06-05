@@ -1,21 +1,20 @@
 use {
     crate::{
-        error::{Error, Result},
+        error::{Error, ErrorData, Result},
         value::{Closure, Env, Primitive, Value},
     },
     std::rc::Rc,
 };
 
+// TODO can these eval_X functions consume their args to avoid some clones?
+
 fn eval_def(args: &[Value], env: &Env) -> Result<Value> {
     if args.len() % 2 == 1 {
-        Err(Error::Arity {
-            target: "def".to_string(),
-            n: args.len(),
-        })
+        Err(Error::new(ErrorData::Todo))
     } else {
         for pair in args.chunks(2) {
             let value = eval(pair[1].clone(), env)?;
-            env.set(unwrap_sym(pair[0].clone()), value);
+            env.set(as_sym(pair[0].clone())?, value);
         }
         Ok(Value::Nil)
     }
@@ -23,17 +22,14 @@ fn eval_def(args: &[Value], env: &Env) -> Result<Value> {
 
 fn eval_fn(args: &[Value], env: &Env) -> Result<Value> {
     if args.len() < 2 {
-        Err(Error::Arity {
-            target: "fn".to_string(),
-            n: args.len(),
-        })
+        Err(Error::new(ErrorData::Todo))
     } else {
         Ok(Value::Closure(Rc::new(Closure {
-            args: unwrap_vec(args[0].clone())
+            args: as_vec(args[0].clone())?
                 .iter()
                 .cloned()
-                .map(unwrap_sym)
-                .collect(),
+                .map(as_sym)
+                .collect::<Result<_>>()?,
             body: args[1..].iter().cloned().collect(),
             env: env.clone(),
         })))
@@ -41,31 +37,28 @@ fn eval_fn(args: &[Value], env: &Env) -> Result<Value> {
 }
 
 fn eval_if(args: &[Value], env: &Env) -> Result<Value> {
-    if args.len() != 3 {
-        Err(Error::Arity {
-            target: "if".to_string(),
-            n: args.len(),
-        })
-    } else {
-        if eval(args[0].clone(), env)?.truthy() {
-            eval(args[1].clone(), env)
-        } else {
-            eval(args[2].clone(), env)
+    for chunk in args.chunks(2) {
+        if chunk.len() == 1 {
+            return eval(chunk[0].clone(), env);
+        }
+        if eval(chunk[0].clone(), env)?.truthy() {
+            return eval(chunk[1].clone(), env);
         }
     }
+    todo!()
 }
 
 pub fn eval(value: Value, env: &Env) -> Result<Value> {
     match value {
-        Value::Sym(sym) => match env.get(&sym) {
+        Value::Sym(sym, meta) => match env.get(&sym) {
             Some(v) => Ok(v),
-            None => Err(Error::UnknownSymbol { target: sym }),
+            None => Err(Error::new(ErrorData::UnknownSym(sym)).with(meta)),
         },
-        Value::List(ref list) => {
+        Value::List(ref list, ref meta) => {
             if list.is_empty() {
                 return Ok(value.clone());
             }
-            if let Value::Sym(sym) = &list[0] {
+            if let Value::Sym(sym, _) = &list[0] {
                 match sym.as_str() {
                     "def" => return eval_def(&list[1..], env),
                     "fn" => return eval_fn(&list[1..], env),
@@ -81,6 +74,10 @@ pub fn eval(value: Value, env: &Env) -> Result<Value> {
                     .map(|v| eval(v, env))
                     .collect::<Result<_>>()?,
             )
+            .map_err(|err| {
+                err.wrap(ErrorData::Apply(list[0].clone()))
+                    .with(meta.clone())
+            })
         }
         Value::Vec(ref vec) => vec
             .iter()
@@ -96,7 +93,7 @@ fn apply(f: Value, args: Vec<Value>) -> Result<Value> {
     match f {
         Value::Primitive(p) => p.apply(args),
         Value::Closure(c) => c.apply(args),
-        _ => Err(Error::NotFn { target: f }),
+        _ => Err(Error::new(ErrorData::Todo)),
     }
 }
 
@@ -106,39 +103,12 @@ trait Apply {
     fn apply(&self, args: Vec<Value>) -> Result<Value>;
 }
 
-// TODO at some point we have to check types and unwrap them to apply primitives, I haven't decided
-// where yet. Maybe these unwrap functions should return Result<_>?
-
-fn unwrap_int(value: Value) -> i32 {
-    match value {
-        Value::Int(int) => int,
-        _ => todo!(),
-    }
-}
-
-fn unwrap_sym(value: Value) -> String {
-    match value {
-        Value::Sym(sym) => sym,
-        _ => todo!(),
-    }
-}
-
-fn unwrap_vec(value: Value) -> Rc<Vec<Value>> {
-    match value {
-        Value::Vec(vec) => vec,
-        _ => todo!(),
-    }
-}
-
 impl Apply for Closure {
     fn apply(&self, args: Vec<Value>) -> Result<Value> {
         if args.len() != self.args.len() {
             // TODO refer to the closure by name if it has one
             // TODO show expected number of args
-            Err(Error::Arity {
-                target: "<closure>".to_string(),
-                n: args.len(),
-            })
+            Err(Error::new(ErrorData::Todo))
         } else {
             let env = self
                 .env
@@ -153,7 +123,7 @@ impl Apply for Closure {
 
 impl Apply for Primitive {
     fn apply(&self, args: Vec<Value>) -> Result<Value> {
-        let args: Vec<i32> = args.into_iter().map(unwrap_int).collect();
+        let args: Vec<i32> = args.into_iter().map(as_int).collect::<Result<_>>()?;
         Ok(match self {
             Primitive::Plus => Value::Int(args.iter().sum()),
             Primitive::Star => Value::Int(args.iter().product()),
@@ -173,5 +143,40 @@ impl Apply for Primitive {
                 _ => args[1..].iter().all(|v| *v == args[0]),
             }),
         })
+    }
+}
+
+fn as_bool(value: Value) -> Result<bool> {
+    match value {
+        Value::Bool(bool) => Ok(bool),
+        _ => Err(Error::new(ErrorData::Type(value, "Bool".to_string()))),
+    }
+}
+
+fn as_int(value: Value) -> Result<i32> {
+    match value {
+        Value::Int(int) => Ok(int),
+        _ => Err(Error::new(ErrorData::Type(value, "Int".to_string()))),
+    }
+}
+
+fn as_sym(value: Value) -> Result<String> {
+    match value {
+        Value::Sym(sym, _) => Ok(sym),
+        _ => Err(Error::new(ErrorData::Type(value, "Sym".to_string()))),
+    }
+}
+
+fn as_list(value: Value) -> Result<Rc<Vec<Value>>> {
+    match value {
+        Value::List(list, _) => Ok(list),
+        _ => Err(Error::new(ErrorData::Type(value, "List".to_string()))),
+    }
+}
+
+fn as_vec(value: Value) -> Result<Rc<Vec<Value>>> {
+    match value {
+        Value::Vec(vec) => Ok(vec),
+        _ => Err(Error::new(ErrorData::Type(value, "Vec".to_string()))),
     }
 }

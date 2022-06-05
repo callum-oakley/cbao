@@ -17,12 +17,17 @@ pub struct Closure {
 }
 
 #[derive(Debug, Clone)]
+pub struct Meta {
+    pub line_no: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
     Nil,
     Bool(bool),
     Int(i32),
-    Sym(String),
-    List(Rc<Vec<Value>>),
+    Sym(String, Meta),
+    List(Rc<Vec<Value>>, Meta),
     Vec(Rc<Vec<Value>>),
     Closure(Rc<Closure>),
     Primitive(Primitive),
@@ -43,8 +48,8 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Bool(bool) => write!(f, "{}", bool),
             Value::Int(int) => write!(f, "{}", int),
-            Value::Sym(sym) => write!(f, "{}", sym),
-            Value::List(list) => write_coll(f, "(", list.iter().cloned(), ")"),
+            Value::Sym(sym, _) => write!(f, "{}", sym),
+            Value::List(list, _) => write_coll(f, "(", list.iter().cloned(), ")"),
             Value::Vec(vec) => write_coll(f, "[", vec.iter().cloned(), "]"),
             Value::Closure(_) => write!(f, "<closure>"),
             Value::Primitive(p) => write!(f, "<primitive {:?}>", p),

@@ -4,7 +4,7 @@ mod runtime;
 mod value;
 
 use {
-    error::{Error, Result},
+    error::{ErrorData, Result},
     std::{
         fs,
         io::{self, prelude::*},
@@ -37,12 +37,12 @@ fn run_repl() -> Result<()> {
     for line in io::stdin().lock().lines() {
         input += &line?;
         match run_source(&input) {
-            Err(Error::UnexpectedEof) => {
-                input.push('\n');
-                prompt()?;
-                continue;
-            }
             Err(err) => {
+                if let ErrorData::UnexpectedEof = err.data {
+                    input.push('\n');
+                    prompt()?;
+                    continue;
+                }
                 error::report(&err);
             }
             Ok(()) => (),

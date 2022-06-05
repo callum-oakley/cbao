@@ -1,7 +1,7 @@
 use {
     crate::{
-        error::{self, Error, Result},
-        value::Value,
+        error::{Error, ErrorData, Result},
+        value::{Meta, Value},
     },
     std::{iter, rc::Rc, str},
 };
@@ -19,12 +19,13 @@ enum TokenData<'a> {
 #[derive(Debug)]
 struct Token<'a> {
     data: TokenData<'a>,
-    offset: usize,
+    line_no: usize,
 }
 
 struct Tokens<'a> {
     source: &'a str,
     chars: iter::Peekable<str::CharIndices<'a>>,
+    line_no: usize,
 }
 
 impl<'a> Tokens<'a> {
@@ -32,6 +33,7 @@ impl<'a> Tokens<'a> {
         Tokens {
             source,
             chars: source.char_indices().peekable(),
+            line_no: 1,
         }
     }
 
@@ -43,7 +45,15 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn next_char_is<F>(&mut self, mut f: F) -> bool
+    fn next_char(&mut self) -> Option<(usize, char)> {
+        let res = self.chars.next();
+        if let Some((_, '\n')) = res {
+            self.line_no += 1;
+        }
+        res
+    }
+
+    fn peek_char_is<F>(&mut self, mut f: F) -> bool
     where
         F: FnMut(char) -> bool,
     {
@@ -51,29 +61,33 @@ impl<'a> Tokens<'a> {
     }
 
     fn read_int(&mut self, offset: usize) -> Result<Token<'a>> {
-        while self.next_char_is(is_symbolic) {
-            self.chars.next();
+        while self.peek_char_is(is_symbolic) {
+            self.next_char();
         }
         self.source[offset..self.end()]
             .parse()
             .map(|int| Token {
                 data: TokenData::Int(int),
-                offset,
+                line_no: self.line_no,
             })
-            .map_err(|err| Error::ParseInt {
-                target: self.source[offset..self.end()].to_string(),
-                line_no: error::line_no(self.source, offset),
-                err,
+            .map_err(|err| {
+                Error::new(ErrorData::ParseInt(
+                    self.source[offset..self.end()].to_string(),
+                    err,
+                ))
+                .with(Meta {
+                    line_no: Some(self.line_no),
+                })
             })
     }
 
     fn read_symbol(&mut self, offset: usize) -> Token<'a> {
-        while self.next_char_is(is_symbolic) {
-            self.chars.next();
+        while self.peek_char_is(is_symbolic) {
+            self.next_char();
         }
         Token {
             data: TokenData::Sym(&self.source[offset..self.end()]),
-            offset,
+            line_no: self.line_no,
         }
     }
 }
@@ -82,44 +96,43 @@ impl<'a> Iterator for Tokens<'a> {
     type Item = Result<Token<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.next_char_is(|c| c.is_whitespace()) {
-            self.chars.next();
+        while self.peek_char_is(|c| c.is_whitespace()) {
+            self.next_char();
         }
-        if self.next_char_is(|c| c == ';') {
-            while !self.next_char_is(|c| c == '\n') {
-                self.chars.next();
+        if self.peek_char_is(|c| c == ';') {
+            while !self.peek_char_is(|c| c == '\n') {
+                self.next_char();
             }
             return self.next();
         }
-        self.chars.next().map(|(offset, c)| {
+        self.next_char().map(|(offset, c)| {
             Ok(match c {
                 '(' => Token {
                     data: TokenData::LeftParen,
-                    offset,
+                    line_no: self.line_no,
                 },
                 ')' => Token {
                     data: TokenData::RightParen,
-                    offset,
+                    line_no: self.line_no,
                 },
                 '[' => Token {
                     data: TokenData::LeftSquare,
-                    offset,
+                    line_no: self.line_no,
                 },
                 ']' => Token {
                     data: TokenData::RightSquare,
-                    offset,
+                    line_no: self.line_no,
                 },
                 c if c.is_ascii_digit()
-                    || (c == '-' || c == '+') && self.next_char_is(|c| c.is_ascii_digit()) =>
+                    || (c == '-' || c == '+') && self.peek_char_is(|c| c.is_ascii_digit()) =>
                 {
                     self.read_int(offset)?
                 }
                 c if is_symbolic(c) => self.read_symbol(offset),
                 c => {
-                    return Err(Error::UnexpectedChar {
-                        target: c,
-                        line_no: error::line_no(self.source, offset),
-                    })
+                    return Err(Error::new(ErrorData::UnexpectedChar(c)).with(Meta {
+                        line_no: Some(self.line_no),
+                    }))
                 }
             })
         })
@@ -127,15 +140,27 @@ impl<'a> Iterator for Tokens<'a> {
 }
 
 struct Reader<'a> {
-    source: &'a str,
     tokens: iter::Peekable<Tokens<'a>>,
 }
 
 impl<'a> Reader<'a> {
-    fn next_token_is(&mut self, data: TokenData) -> bool {
+    fn peek_token_is(&mut self, data: &TokenData) -> bool {
         self.tokens
             .peek()
-            .map_or(false, |t| t.as_ref().map_or(false, |t| t.data == data))
+            .map_or(false, |t| t.as_ref().map_or(false, |t| &t.data == data))
+    }
+
+    fn read_coll(&mut self, close: TokenData) -> Result<Vec<Value>> {
+        let mut coll = Vec::new();
+        while !self.peek_token_is(&close) {
+            if let Some(value) = self.next() {
+                coll.push(value?);
+            } else {
+                return Err(Error::new(ErrorData::UnexpectedEof).with(Meta { line_no: None }));
+            }
+        }
+        self.tokens.next();
+        Ok(coll)
     }
 }
 
@@ -147,43 +172,30 @@ impl<'a> Iterator for Reader<'a> {
             let token = token?;
             Ok(match token.data {
                 TokenData::Int(int) => Value::Int(int),
-                TokenData::Sym(sym) => Value::Sym(sym.to_string()),
-                // TODO DRY
-                TokenData::LeftParen => {
-                    let mut list = Vec::new();
-                    while !self.next_token_is(TokenData::RightParen) {
-                        if let Some(value) = self.next() {
-                            list.push(value?);
-                        } else {
-                            return Err(Error::UnexpectedEof);
-                        }
-                    }
-                    self.tokens.next();
-                    Value::List(Rc::new(list))
-                }
+                TokenData::Sym(sym) => Value::Sym(
+                    sym.to_string(),
+                    Meta {
+                        line_no: Some(token.line_no),
+                    },
+                ),
+                TokenData::LeftParen => Value::List(
+                    Rc::new(self.read_coll(TokenData::RightParen)?),
+                    Meta {
+                        line_no: Some(token.line_no),
+                    },
+                ),
                 TokenData::RightParen => {
-                    return Err(Error::UnexpectedChar {
-                        target: ')',
-                        line_no: error::line_no(self.source, token.offset),
-                    })
+                    return Err(Error::new(ErrorData::UnexpectedChar(')')).with(Meta {
+                        line_no: Some(token.line_no),
+                    }))
                 }
                 TokenData::LeftSquare => {
-                    let mut vec = Vec::new();
-                    while !self.next_token_is(TokenData::RightSquare) {
-                        if let Some(value) = self.next() {
-                            vec.push(value?);
-                        } else {
-                            return Err(Error::UnexpectedEof);
-                        }
-                    }
-                    self.tokens.next();
-                    Value::Vec(Rc::new(vec))
+                    Value::Vec(Rc::new(self.read_coll(TokenData::RightSquare)?))
                 }
                 TokenData::RightSquare => {
-                    return Err(Error::UnexpectedChar {
-                        target: ']',
-                        line_no: error::line_no(self.source, token.offset),
-                    })
+                    return Err(Error::new(ErrorData::UnexpectedChar(']')).with(Meta {
+                        line_no: Some(token.line_no),
+                    }))
                 }
             })
         })
@@ -196,7 +208,6 @@ fn is_symbolic(c: char) -> bool {
 
 pub fn read(source: &str) -> impl Iterator<Item = Result<Value>> + '_ {
     Reader {
-        source,
         tokens: Tokens::new(source).peekable(),
     }
 }

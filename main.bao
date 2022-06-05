@@ -1,8 +1,12 @@
-;; This or is eager in both of its arguments. It should short curcuit (but we
-;; need macros for that).
+;; This and and or are eager in both of their arguments. They should short
+;; curcuit (but we need macros for that).
 (def or
   (fn [a b]
     (if a a b)))
+
+(def and
+  (fn [a b]
+    (if a b a)))
 
 (def fib-rec
   (fn [n]
@@ -14,12 +18,26 @@
   (fn [n]
     (def loop
       (fn [a b n]
-        ;; no case yet...
-        (if (= 0 n)
-          a
-          (if (= 1 n)
-            b
-            (loop b (+ a b) (- n 1))))))
+        (if
+          (= 0 n) a
+          (= 1 n) b
+          (loop b (+ a b) (- n 1)))))
     (loop 0 1 n)))
 
 (fib-iter 25)
+
+; (defmacro defn [sym args & body]
+;   `(def ~sym (fn ~args ~@body)))
+;
+; (defmacro do [& body]
+;   `((fn [] ~@body))
+;
+; (defmacro let [bindings & body]
+;   `(do
+;      (def ~@bindings)
+;      ~@body))
+;
+; (defmacro when [condition & body]
+;   `(if ~condition
+;      (do ~@body)
+;      nil))
