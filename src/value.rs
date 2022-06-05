@@ -11,7 +11,7 @@ pub enum Primitive {
 
 #[derive(Debug)]
 pub struct Closure {
-    pub args: Vec<String>,
+    pub params: Vec<String>,
     pub body: Vec<Value>,
     pub env: Env,
 }

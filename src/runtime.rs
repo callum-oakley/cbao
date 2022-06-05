@@ -6,8 +6,6 @@ use {
     std::rc::Rc,
 };
 
-// TODO can these eval_X functions consume their args to avoid some clones?
-
 fn eval_def(args: &[Value], env: &Env) -> Result<Value> {
     if args.len() % 2 == 1 {
         Err(Error::new(ErrorData::Todo))
@@ -25,7 +23,7 @@ fn eval_fn(args: &[Value], env: &Env) -> Result<Value> {
         Err(Error::new(ErrorData::Todo))
     } else {
         Ok(Value::Closure(Rc::new(Closure {
-            args: as_vec(args[0].clone())?
+            params: as_vec(args[0].clone())?
                 .iter()
                 .cloned()
                 .map(as_sym)
@@ -105,14 +103,12 @@ trait Apply {
 
 impl Apply for Closure {
     fn apply(&self, args: Vec<Value>) -> Result<Value> {
-        if args.len() != self.args.len() {
-            // TODO refer to the closure by name if it has one
-            // TODO show expected number of args
+        if args.len() != self.params.len() {
             Err(Error::new(ErrorData::Todo))
         } else {
             let env = self
                 .env
-                .extend(self.args.iter().cloned().zip(args).collect());
+                .extend(self.params.iter().cloned().zip(args).collect());
             for i in 0..self.body.len() - 1 {
                 eval(self.body[i].clone(), &env)?;
             }
