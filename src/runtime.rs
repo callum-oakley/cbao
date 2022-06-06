@@ -1,10 +1,58 @@
 use {
     crate::{
         error::{Error, ErrorData, Result},
-        value::{Closure, Env, Primitive, Value},
+        value::{Closure, Env, Meta, Primitive, Value},
     },
-    std::rc::Rc,
+    std::{iter, rc::Rc},
 };
+
+fn quasiquote(value: &Value) -> Value {
+    match value {
+        Value::List(list, meta) => {
+            if list.len() == 0 {
+                value.clone()
+            } else if list[0].is_sym("unquote") {
+                list[1].clone()
+            } else {
+                match &list[0] {
+                    Value::List(element, _)
+                        if element.len() > 0 && element[0].is_sym("splice-unquote") =>
+                    {
+                        Value::List(
+                            Rc::new(vec![
+                                Value::Sym("concat".to_string(), Meta { line_no: None }),
+                                element[1].clone(),
+                                quasiquote(&Value::List(
+                                    Rc::new(list[1..].iter().cloned().collect()),
+                                    Meta { line_no: None },
+                                )),
+                            ]),
+                            meta.clone(),
+                        )
+                    }
+                    _ => Value::List(
+                        Rc::new(vec![
+                            Value::Sym("cons".to_string(), Meta { line_no: None }),
+                            quasiquote(&list[0]),
+                            quasiquote(&Value::List(
+                                Rc::new(list[1..].iter().cloned().collect()),
+                                Meta { line_no: None },
+                            )),
+                        ]),
+                        meta.clone(),
+                    ),
+                }
+            }
+        }
+        _ => Value::List(
+            Rc::new(vec![
+                Value::Sym("quote".to_string(), Meta { line_no: None }),
+                value.clone(),
+            ]),
+            Meta { line_no: None },
+        ),
+    }
+}
 
 fn eval_def(args: &[Value], env: &Env) -> Result<Value> {
     if args.len() % 2 == 1 {
@@ -46,6 +94,18 @@ fn eval_if(args: &[Value], env: &Env) -> Result<Value> {
     todo!()
 }
 
+fn eval_quote(args: &[Value], _: &Env) -> Result<Value> {
+    Ok(args[0].clone())
+}
+
+fn eval_quasiquote(args: &[Value], env: &Env) -> Result<Value> {
+    if args.len() != 1 {
+        Err(Error::new(ErrorData::Todo))
+    } else {
+        eval(quasiquote(&args[0]), env)
+    }
+}
+
 pub fn eval(value: Value, env: &Env) -> Result<Value> {
     match value {
         Value::Sym(sym, meta) => match env.get(&sym) {
@@ -61,6 +121,8 @@ pub fn eval(value: Value, env: &Env) -> Result<Value> {
                     "def" => return eval_def(&list[1..], env),
                     "fn" => return eval_fn(&list[1..], env),
                     "if" => return eval_if(&list[1..], env),
+                    "quote" => return eval_quote(&list[1..], env),
+                    "quasiquote" => return eval_quasiquote(&list[1..], env),
                     _ => (),
                 }
             }
@@ -87,6 +149,7 @@ pub fn eval(value: Value, env: &Env) -> Result<Value> {
     }
 }
 
+// TODO should all these Vec<Value> args be &[Value]? Might avoid some clones.
 fn apply(f: Value, args: Vec<Value>) -> Result<Value> {
     match f {
         Value::Primitive(p) => p.apply(args),
@@ -117,8 +180,22 @@ impl Apply for Closure {
     }
 }
 
+// TODO this needs a refactor
 impl Apply for Primitive {
     fn apply(&self, args: Vec<Value>) -> Result<Value> {
+        match self {
+            Primitive::Cons => {
+                return Ok(Value::List(
+                    Rc::new(
+                        iter::once(args[0].clone())
+                            .chain(as_vec(args[1].clone())?.iter().cloned())
+                            .collect(),
+                    ),
+                    Meta { line_no: None },
+                ))
+            }
+            _ => (),
+        }
         let args: Vec<i32> = args.into_iter().map(as_int).collect::<Result<_>>()?;
         Ok(match self {
             Primitive::Plus => Value::Int(args.iter().sum()),
@@ -138,6 +215,7 @@ impl Apply for Primitive {
                 0 => true,
                 _ => args[1..].iter().all(|v| *v == args[0]),
             }),
+            _ => todo!(),
         })
     }
 }
@@ -163,16 +241,9 @@ fn as_sym(value: Value) -> Result<String> {
     }
 }
 
-fn as_list(value: Value) -> Result<Rc<Vec<Value>>> {
-    match value {
-        Value::List(list, _) => Ok(list),
-        _ => Err(Error::new(ErrorData::Type(value, "List".to_string()))),
-    }
-}
-
 fn as_vec(value: Value) -> Result<Rc<Vec<Value>>> {
     match value {
-        Value::Vec(vec) => Ok(vec),
+        Value::List(vec, _) | Value::Vec(vec) => Ok(vec),
         _ => Err(Error::new(ErrorData::Type(value, "Vec".to_string()))),
     }
 }

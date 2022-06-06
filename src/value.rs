@@ -2,6 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug, Clone)]
 pub enum Primitive {
+    Cons,
     Plus,
     Minus,
     Star,
@@ -38,6 +39,13 @@ impl Value {
         match self {
             Value::Nil | Value::Bool(false) => false,
             _ => true,
+        }
+    }
+
+    pub fn is_sym(&self, sym: &str) -> bool {
+        match self {
+            Value::Sym(s, _) => s.as_str() == sym,
+            _ => false,
         }
     }
 }
@@ -80,6 +88,7 @@ impl Env {
         env.set("-".to_string(), Value::Primitive(Primitive::Minus));
         env.set("/".to_string(), Value::Primitive(Primitive::Slash));
         env.set("=".to_string(), Value::Primitive(Primitive::Eq));
+        env.set("cons".to_string(), Value::Primitive(Primitive::Cons));
         env
     }
 

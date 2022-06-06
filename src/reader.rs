@@ -14,6 +14,10 @@ enum TokenData<'a> {
     RightSquare,
     Int(i32),
     Sym(&'a str),
+    Quote,
+    Quasiquote,
+    Unquote,
+    SpliceUnquote,
 }
 
 #[derive(Debug)]
@@ -123,6 +127,28 @@ impl<'a> Iterator for Tokens<'a> {
                     data: TokenData::RightSquare,
                     line_no: self.line_no,
                 },
+                '\'' => Token {
+                    data: TokenData::Quote,
+                    line_no: self.line_no,
+                },
+                '`' => Token {
+                    data: TokenData::Quasiquote,
+                    line_no: self.line_no,
+                },
+                '~' => {
+                    if self.peek_char_is(|c| c == '@') {
+                        self.next();
+                        Token {
+                            data: TokenData::SpliceUnquote,
+                            line_no: self.line_no,
+                        }
+                    } else {
+                        Token {
+                            data: TokenData::Unquote,
+                            line_no: self.line_no,
+                        }
+                    }
+                }
                 c if c.is_ascii_digit()
                     || (c == '-' || c == '+') && self.peek_char_is(|c| c.is_ascii_digit()) =>
                 {
@@ -156,11 +182,29 @@ impl<'a> Reader<'a> {
             if let Some(value) = self.next() {
                 coll.push(value?);
             } else {
-                return Err(Error::new(ErrorData::UnexpectedEof).with(Meta { line_no: None }));
+                return Err(Error::new(ErrorData::UnexpectedEof));
             }
         }
         self.tokens.next();
         Ok(coll)
+    }
+
+    fn application(&mut self, sym: &str, line_no: usize) -> Result<Value> {
+        Ok(Value::List(
+            Rc::new(vec![
+                Value::Sym(
+                    sym.to_string(),
+                    Meta {
+                        line_no: Some(line_no),
+                    },
+                ),
+                self.next()
+                    .unwrap_or(Err(Error::new(ErrorData::UnexpectedEof)))?,
+            ]),
+            Meta {
+                line_no: Some(line_no),
+            },
+        ))
     }
 }
 
@@ -197,6 +241,10 @@ impl<'a> Iterator for Reader<'a> {
                         line_no: Some(token.line_no),
                     }))
                 }
+                TokenData::Quote => self.application("quote", token.line_no)?,
+                TokenData::Quasiquote => self.application("quasiquote", token.line_no)?,
+                TokenData::Unquote => self.application("unquote", token.line_no)?,
+                TokenData::SpliceUnquote => self.application("splice-unquote", token.line_no)?,
             })
         })
     }
