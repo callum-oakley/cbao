@@ -3,23 +3,12 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 #[derive(Debug, Clone)]
 pub enum Primitive {
     Cons,
-    Plus,
-    Minus,
-    Star,
-    Slash,
+    Car,
+    Cdr,
+    Add,
+    Mul,
+    Sub,
     Eq,
-}
-
-#[derive(Debug)]
-pub struct Closure {
-    pub params: Vec<String>,
-    pub body: Vec<Value>,
-    pub env: Env,
-}
-
-#[derive(Debug, Clone)]
-pub struct Meta {
-    pub line_no: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -27,27 +16,14 @@ pub enum Value {
     Nil,
     Bool(bool),
     Int(i32),
-    Sym(String, Meta),
-    List(Rc<Vec<Value>>, Meta),
-    Vec(Rc<Vec<Value>>),
-    Closure(Rc<Closure>),
+    Sym(String),
+    Pair(Rc<Value>, Rc<Value>),
+    Function {
+        params: Rc<Value>,
+        body: Rc<Value>,
+        env: Env,
+    },
     Primitive(Primitive),
-}
-
-impl Value {
-    pub fn truthy(&self) -> bool {
-        match self {
-            Value::Nil | Value::Bool(false) => false,
-            _ => true,
-        }
-    }
-
-    pub fn is_sym(&self, sym: &str) -> bool {
-        match self {
-            Value::Sym(s, _) => s.as_str() == sym,
-            _ => false,
-        }
-    }
 }
 
 impl fmt::Display for Value {
@@ -56,10 +32,9 @@ impl fmt::Display for Value {
             Value::Nil => write!(f, "nil"),
             Value::Bool(bool) => write!(f, "{}", bool),
             Value::Int(int) => write!(f, "{}", int),
-            Value::Sym(sym, _) => write!(f, "{}", sym),
-            Value::List(list, _) => write_coll(f, "(", list.iter().cloned(), ")"),
-            Value::Vec(vec) => write_coll(f, "[", vec.iter().cloned(), "]"),
-            Value::Closure(_) => write!(f, "<closure>"),
+            Value::Sym(sym) => write!(f, "{}", sym),
+            Value::Pair(car, cdr) => write!(f, "({car} . {cdr})"),
+            Value::Function { .. } => write!(f, "<function>"),
             Value::Primitive(p) => write!(f, "<primitive {:?}>", p),
         }
     }
@@ -76,20 +51,30 @@ pub struct Env(Rc<RefCell<EnvData>>);
 
 impl Env {
     pub fn prelude() -> Env {
-        let env = Env(Rc::new(RefCell::new(EnvData {
-            frame: HashMap::new(),
+        Env(Rc::new(RefCell::new(EnvData {
+            frame: vec![
+                ("nil".to_string(), Value::Nil),
+                ("true".to_string(), Value::Bool(true)),
+                ("false".to_string(), Value::Bool(false)),
+                ("cons".to_string(), Value::Primitive(Primitive::Cons)),
+                ("car".to_string(), Value::Primitive(Primitive::Car)),
+                ("cdr".to_string(), Value::Primitive(Primitive::Cdr)),
+                ("+".to_string(), Value::Primitive(Primitive::Add)),
+                ("*".to_string(), Value::Primitive(Primitive::Mul)),
+                ("-".to_string(), Value::Primitive(Primitive::Sub)),
+                ("=".to_string(), Value::Primitive(Primitive::Eq)),
+            ]
+            .into_iter()
+            .collect(),
             outer: None,
-        })));
-        env.set("nil".to_string(), Value::Nil);
-        env.set("true".to_string(), Value::Bool(true));
-        env.set("false".to_string(), Value::Bool(false));
-        env.set("+".to_string(), Value::Primitive(Primitive::Plus));
-        env.set("*".to_string(), Value::Primitive(Primitive::Star));
-        env.set("-".to_string(), Value::Primitive(Primitive::Minus));
-        env.set("/".to_string(), Value::Primitive(Primitive::Slash));
-        env.set("=".to_string(), Value::Primitive(Primitive::Eq));
-        env.set("cons".to_string(), Value::Primitive(Primitive::Cons));
-        env
+        })))
+    }
+
+    pub fn extend(&self, frame: HashMap<String, Value>) -> Env {
+        Env(Rc::new(RefCell::new(EnvData {
+            frame,
+            outer: Some(self.clone()),
+        })))
     }
 
     pub fn set(&self, sym: String, value: Value) {
@@ -104,25 +89,4 @@ impl Env {
             .cloned()
             .or_else(|| env_data.outer.as_ref().and_then(|outer| outer.get(sym)))
     }
-
-    pub fn extend(&self, frame: HashMap<String, Value>) -> Env {
-        Env(Rc::new(RefCell::new(EnvData {
-            frame,
-            outer: Some(self.clone()),
-        })))
-    }
-}
-
-fn write_coll<I>(f: &mut fmt::Formatter<'_>, open: &str, mut coll: I, close: &str) -> fmt::Result
-where
-    I: Iterator<Item = Value>,
-{
-    write!(f, "{}", open)?;
-    if let Some(element) = coll.next() {
-        write!(f, "{}", element)?;
-        for element in coll {
-            write!(f, " {}", element)?;
-        }
-    }
-    write!(f, "{}", close)
 }

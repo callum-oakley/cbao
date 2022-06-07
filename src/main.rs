@@ -1,6 +1,6 @@
+mod data;
 mod error;
 mod reader;
-mod runtime;
 mod value;
 
 use {
@@ -15,7 +15,7 @@ use {
 fn run_source(source: &str) -> Result<()> {
     let prelude = Env::prelude();
     for value in reader::read(source) {
-        println!("{}", runtime::eval(value?, &prelude)?);
+        println!("{}", value?);
     }
     Ok(())
 }
@@ -24,23 +24,22 @@ fn run_file(path: &str) -> Result<()> {
     run_source(&fs::read_to_string(path)?)
 }
 
-fn prompt() -> Result<()> {
-    print!("> ");
+fn prompt(s: &str) -> Result<()> {
+    print!("{}", s);
     io::stdout().flush()?;
     Ok(())
 }
 
 fn run_repl() -> Result<()> {
     let mut input = String::new();
-    println!();
-    prompt()?;
+    prompt("\n> ")?;
     for line in io::stdin().lock().lines() {
         input += &line?;
         match run_source(&input) {
             Err(err) => {
                 if let ErrorData::UnexpectedEof = err.data {
                     input.push('\n');
-                    prompt()?;
+                    prompt("  ")?;
                     continue;
                 }
                 error::report(&err);
@@ -48,8 +47,7 @@ fn run_repl() -> Result<()> {
             Ok(()) => (),
         };
         input.clear();
-        println!();
-        prompt()?;
+        prompt("\n> ")?;
     }
     Ok(())
 }

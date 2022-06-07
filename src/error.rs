@@ -1,7 +1,4 @@
-use {
-    crate::value::{Meta, Value},
-    std::fmt,
-};
+use {crate::value::Value, std::fmt};
 
 #[derive(Debug)]
 pub enum ErrorData {
@@ -10,47 +7,81 @@ pub enum ErrorData {
     UnexpectedChar(char),
     UnexpectedEof,
     UnknownSym(String),
-    Apply(Value),
-    Type(Value, String),
-    Todo,
+    Function(Value),
+    Cast(Value, String),
+    Todo(String),
 }
 
 #[derive(Debug)]
 pub struct Error {
     pub data: ErrorData,
-    meta: Meta,
     source: Option<Box<Error>>,
 }
 
 impl Error {
-    pub fn new(data: ErrorData) -> Error {
+    pub fn parse_int(s: String, err: std::num::ParseIntError) -> Error {
         Error {
-            data,
-            meta: Meta { line_no: None },
+            data: ErrorData::ParseInt(s, err),
             source: None,
         }
     }
 
-    pub fn with(self, meta: Meta) -> Error {
+    pub fn unexpected_char(c: char) -> Error {
         Error {
-            data: self.data,
-            meta,
-            source: self.source,
+            data: ErrorData::UnexpectedChar(c),
+            source: None,
         }
     }
 
-    pub fn wrap(self, data: ErrorData) -> Error {
+    pub fn unexpected_eof() -> Error {
         Error {
-            data,
-            meta: Meta { line_no: None },
-            source: Some(Box::new(self)),
+            data: ErrorData::UnexpectedEof,
+            source: None,
+        }
+    }
+
+    pub fn unknown_sym(sym: String) -> Error {
+        Error {
+            data: ErrorData::UnknownSym(sym),
+            source: None,
+        }
+    }
+
+    pub fn function(value: Value) -> Error {
+        Error {
+            data: ErrorData::Function(value),
+            source: None,
+        }
+    }
+
+    pub fn cast(v: Value, t: String) -> Error {
+        Error {
+            data: ErrorData::Cast(v, t),
+            source: None,
+        }
+    }
+
+    pub fn todo(msg: String) -> Error {
+        Error {
+            data: ErrorData::Todo(msg),
+            source: None,
+        }
+    }
+
+    pub fn source(self, err: Error) -> Error {
+        Error {
+            data: self.data,
+            source: Some(Box::new(err)),
         }
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
-        Error::new(ErrorData::IO(err))
+        Error {
+            data: ErrorData::IO(err),
+            source: None,
+        }
     }
 }
 
@@ -58,18 +89,14 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.data {
             ErrorData::IO(err) => err.fmt(f),
-            ErrorData::ParseInt(s, _) => write!(f, "failed to parse '{s}' as an Int"),
+            ErrorData::ParseInt(s, _) => write!(f, "failed to parse '{s}' as an int"),
             ErrorData::UnexpectedChar(c) => write!(f, "unexpected char '{c}'"),
             ErrorData::UnexpectedEof => write!(f, "unexpected end of input"),
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
-            ErrorData::Apply(value) => write!(f, "in '{value}'"),
-            ErrorData::Type(value, t) => write!(f, "type error: '{value}' is not {t}"),
-            ErrorData::Todo => write!(f, "TODO"),
-        }?;
-        if let Some(line_no) = self.meta.line_no {
-            write!(f, " (line {line_no})")?;
+            ErrorData::Function(value) => write!(f, "in function '{value}'"),
+            ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
+            ErrorData::Todo(msg) => write!(f, "TODO {msg}"),
         }
-        Ok(())
     }
 }
 

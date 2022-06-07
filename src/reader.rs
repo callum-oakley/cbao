@@ -1,17 +1,17 @@
 use {
     crate::{
-        error::{Error, ErrorData, Result},
-        value::{Meta, Value},
+        data,
+        error::{Error, Result},
+        value::Value,
     },
-    std::{iter, rc::Rc, str},
+    std::{iter, str},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum TokenData<'a> {
     LeftParen,
     RightParen,
-    LeftSquare,
-    RightSquare,
+    Dot,
     Int(i32),
     Sym(&'a str),
     Quote,
@@ -20,7 +20,7 @@ enum TokenData<'a> {
     SpliceUnquote,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Token<'a> {
     data: TokenData<'a>,
     line_no: usize,
@@ -74,15 +74,7 @@ impl<'a> Tokens<'a> {
                 data: TokenData::Int(int),
                 line_no: self.line_no,
             })
-            .map_err(|err| {
-                Error::new(ErrorData::ParseInt(
-                    self.source[offset..self.end()].to_string(),
-                    err,
-                ))
-                .with(Meta {
-                    line_no: Some(self.line_no),
-                })
-            })
+            .map_err(|err| Error::parse_int(self.source[offset..self.end()].to_string(), err))
     }
 
     fn read_symbol(&mut self, offset: usize) -> Token<'a> {
@@ -119,12 +111,8 @@ impl<'a> Iterator for Tokens<'a> {
                     data: TokenData::RightParen,
                     line_no: self.line_no,
                 },
-                '[' => Token {
-                    data: TokenData::LeftSquare,
-                    line_no: self.line_no,
-                },
-                ']' => Token {
-                    data: TokenData::RightSquare,
+                '.' => Token {
+                    data: TokenData::Dot,
                     line_no: self.line_no,
                 },
                 '\'' => Token {
@@ -137,7 +125,7 @@ impl<'a> Iterator for Tokens<'a> {
                 },
                 '~' => {
                     if self.peek_char_is(|c| c == '@') {
-                        self.next();
+                        self.next_char();
                         Token {
                             data: TokenData::SpliceUnquote,
                             line_no: self.line_no,
@@ -155,11 +143,7 @@ impl<'a> Iterator for Tokens<'a> {
                     self.read_int(offset)?
                 }
                 c if is_symbolic(c) => self.read_symbol(offset),
-                c => {
-                    return Err(Error::new(ErrorData::UnexpectedChar(c)).with(Meta {
-                        line_no: Some(self.line_no),
-                    }))
-                }
+                c => return Err(Error::unexpected_char(c)),
             })
         })
     }
@@ -170,41 +154,51 @@ struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-    fn peek_token_is(&mut self, data: &TokenData) -> bool {
+    fn peek_token_is(&mut self, data: TokenData) -> bool {
         self.tokens
             .peek()
-            .map_or(false, |t| t.as_ref().map_or(false, |t| &t.data == data))
+            .map_or(false, |t| t.as_ref().map_or(false, |t| t.data == data))
     }
 
-    fn read_coll(&mut self, close: TokenData) -> Result<Vec<Value>> {
-        let mut coll = Vec::new();
-        while !self.peek_token_is(&close) {
-            if let Some(value) = self.next() {
-                coll.push(value?);
-            } else {
-                return Err(Error::new(ErrorData::UnexpectedEof));
-            }
+    fn application(&mut self, sym: &str) -> Result<Value> {
+        match self.next() {
+            Some(v) => Ok(data::cons(
+                Value::Sym(sym.to_string()),
+                data::cons(v?, Value::Nil),
+            )),
+            None => Err(Error::unexpected_eof()),
         }
-        self.tokens.next();
-        Ok(coll)
     }
 
-    fn application(&mut self, sym: &str, line_no: usize) -> Result<Value> {
-        Ok(Value::List(
-            Rc::new(vec![
-                Value::Sym(
-                    sym.to_string(),
-                    Meta {
-                        line_no: Some(line_no),
-                    },
-                ),
-                self.next()
-                    .unwrap_or(Err(Error::new(ErrorData::UnexpectedEof)))?,
-            ]),
-            Meta {
-                line_no: Some(line_no),
-            },
-        ))
+    fn consume(&mut self, data: TokenData) -> Result<()> {
+        match self.tokens.next() {
+            Some(Ok(token)) => {
+                if token.data == data {
+                    Ok(())
+                } else {
+                    Err(Error::todo("unexpected token".to_string()))
+                }
+            }
+            Some(Err(err)) => Err(err),
+            None => Err(Error::unexpected_eof()),
+        }
+    }
+
+    fn read_list(&mut self) -> Result<Value> {
+        if self.peek_token_is(TokenData::RightParen) {
+            self.consume(TokenData::RightParen)?;
+            Ok(Value::Nil)
+        } else if self.peek_token_is(TokenData::Dot) {
+            self.consume(TokenData::Dot)?;
+            let res = self.next().unwrap_or(Err(Error::unexpected_eof()));
+            self.consume(TokenData::RightParen)?;
+            res
+        } else {
+            Ok(data::cons(
+                self.next().unwrap_or(Err(Error::unexpected_eof()))?,
+                self.read_list()?,
+            ))
+        }
     }
 }
 
@@ -213,45 +207,23 @@ impl<'a> Iterator for Reader<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.tokens.next().map(|token| {
-            let token = token?;
-            Ok(match token.data {
+            Ok(match token?.data {
                 TokenData::Int(int) => Value::Int(int),
-                TokenData::Sym(sym) => Value::Sym(
-                    sym.to_string(),
-                    Meta {
-                        line_no: Some(token.line_no),
-                    },
-                ),
-                TokenData::LeftParen => Value::List(
-                    Rc::new(self.read_coll(TokenData::RightParen)?),
-                    Meta {
-                        line_no: Some(token.line_no),
-                    },
-                ),
-                TokenData::RightParen => {
-                    return Err(Error::new(ErrorData::UnexpectedChar(')')).with(Meta {
-                        line_no: Some(token.line_no),
-                    }))
-                }
-                TokenData::LeftSquare => {
-                    Value::Vec(Rc::new(self.read_coll(TokenData::RightSquare)?))
-                }
-                TokenData::RightSquare => {
-                    return Err(Error::new(ErrorData::UnexpectedChar(']')).with(Meta {
-                        line_no: Some(token.line_no),
-                    }))
-                }
-                TokenData::Quote => self.application("quote", token.line_no)?,
-                TokenData::Quasiquote => self.application("quasiquote", token.line_no)?,
-                TokenData::Unquote => self.application("unquote", token.line_no)?,
-                TokenData::SpliceUnquote => self.application("splice-unquote", token.line_no)?,
+                TokenData::Sym(sym) => Value::Sym(sym.to_string()),
+                TokenData::LeftParen => self.read_list()?,
+                TokenData::RightParen => return Err(Error::unexpected_char(')')),
+                TokenData::Dot => return Err(Error::unexpected_char('.')),
+                TokenData::Quote => self.application("quote")?,
+                TokenData::Quasiquote => self.application("quasiquote")?,
+                TokenData::Unquote => self.application("unquote")?,
+                TokenData::SpliceUnquote => self.application("splice-unquote")?,
             })
         })
     }
 }
 
 fn is_symbolic(c: char) -> bool {
-    c.is_alphanumeric() || "*+!-_'?<>=/".contains(c)
+    c.is_alphanumeric() || "!$%&*+-./:<=>?@^_~".contains(c)
 }
 
 pub fn read(source: &str) -> impl Iterator<Item = Result<Value>> + '_ {
