@@ -40,9 +40,9 @@ impl Error {
         }
     }
 
-    pub fn unknown_sym(sym: Value) -> Error {
+    pub fn unknown_sym(sym: &Value) -> Error {
         Error {
-            data: ErrorData::UnknownSym(sym),
+            data: ErrorData::UnknownSym(sym.clone()),
             source: None,
         }
     }
@@ -54,9 +54,9 @@ impl Error {
         }
     }
 
-    pub fn cast(v: Value, t: &str) -> Error {
+    pub fn cast(v: &Value, t: &str) -> Error {
         Error {
-            data: ErrorData::Cast(v, t.to_string()),
+            data: ErrorData::Cast(v.clone(), t.to_string()),
             source: None,
         }
     }

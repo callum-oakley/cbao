@@ -4,10 +4,10 @@ use crate::{
     value::{Env, Primitive, Proc, Value},
 };
 
-fn apply(proc: Value, args: Value) -> Result<Value> {
+fn apply(proc: &Value, args: &Value) -> Result<Value> {
     match proc {
-        Value::Proc(Proc::Closure(ref closure)) => todo!(),
-        Value::Proc(Proc::Primitive(ref primitive)) => match primitive {
+        Value::Proc(Proc::Closure(closure)) => todo!(),
+        Value::Proc(Proc::Primitive(primitive)) => match primitive {
             Primitive::Cons => primitives::cons(args),
             Primitive::Car => primitives::car(args),
             Primitive::Cdr => primitives::cdr(args),
@@ -21,23 +21,20 @@ fn apply(proc: Value, args: Value) -> Result<Value> {
     }
 }
 
-fn eval_list(value: Value, env: &Env) -> Result<Value> {
+fn eval_list(value: &Value, env: &Env) -> Result<Value> {
     match value {
-        Value::Pair(ref pair) => Ok(Value::cons(
-            eval(pair.car().clone(), env)?,
-            eval_list(pair.cdr().clone(), env)?,
+        Value::Pair(pair) => Ok(Value::cons(
+            eval(pair.car(), env)?,
+            eval_list(pair.cdr(), env)?,
         )),
         _ => eval(value, env),
     }
 }
 
-pub fn eval(value: Value, env: &Env) -> Result<Value> {
+pub fn eval(value: &Value, env: &Env) -> Result<Value> {
     match value {
-        Value::Sym(ref sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
-        Value::Pair(ref pair) => apply(
-            eval(pair.car().clone(), env)?,
-            eval_list(pair.cdr().clone(), env)?,
-        ),
-        _ => Ok(value),
+        Value::Sym(sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
+        Value::Pair(pair) => apply(&eval(pair.car(), env)?, &eval_list(pair.cdr(), env)?),
+        _ => Ok(value.clone()),
     }
 }

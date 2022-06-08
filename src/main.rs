@@ -16,7 +16,7 @@ use {
 fn run_source(source: &str) -> Result<()> {
     let prelude = Env::prelude();
     for value in reader::read(source) {
-        println!("{}", eval::eval(value?, &prelude)?);
+        println!("{}", eval::eval(&value?, &prelude)?);
     }
     Ok(())
 }
