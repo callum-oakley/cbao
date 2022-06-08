@@ -1,5 +1,6 @@
-mod data;
 mod error;
+mod eval;
+mod primitives;
 mod reader;
 mod value;
 
@@ -15,7 +16,7 @@ use {
 fn run_source(source: &str) -> Result<()> {
     let prelude = Env::prelude();
     for value in reader::read(source) {
-        println!("{}", value?);
+        println!("{}", eval::eval(value?, &prelude)?);
     }
     Ok(())
 }

@@ -1,6 +1,5 @@
 use {
     crate::{
-        data,
         error::{Error, Result},
         value::Value,
     },
@@ -74,7 +73,7 @@ impl<'a> Tokens<'a> {
                 data: TokenData::Int(int),
                 line_no: self.line_no,
             })
-            .map_err(|err| Error::parse_int(self.source[offset..self.end()].to_string(), err))
+            .map_err(|err| Error::parse_int(&self.source[offset..self.end()], err))
     }
 
     fn read_symbol(&mut self, offset: usize) -> Token<'a> {
@@ -162,9 +161,9 @@ impl<'a> Reader<'a> {
 
     fn application(&mut self, sym: &str) -> Result<Value> {
         match self.next() {
-            Some(v) => Ok(data::cons(
-                Value::Sym(sym.to_string()),
-                data::cons(v?, Value::Nil),
+            Some(v) => Ok(Value::cons(
+                Value::sym(sym.to_string()),
+                Value::cons(v?, Value::Nil),
             )),
             None => Err(Error::unexpected_eof()),
         }
@@ -176,7 +175,7 @@ impl<'a> Reader<'a> {
                 if token.data == data {
                     Ok(())
                 } else {
-                    Err(Error::todo("unexpected token".to_string()))
+                    Err(Error::todo("unexpected token"))
                 }
             }
             Some(Err(err)) => Err(err),
@@ -194,7 +193,7 @@ impl<'a> Reader<'a> {
             self.consume(TokenData::RightParen)?;
             res
         } else {
-            Ok(data::cons(
+            Ok(Value::cons(
                 self.next().unwrap_or(Err(Error::unexpected_eof()))?,
                 self.read_list()?,
             ))
@@ -209,7 +208,7 @@ impl<'a> Iterator for Reader<'a> {
         self.tokens.next().map(|token| {
             Ok(match token?.data {
                 TokenData::Int(int) => Value::Int(int),
-                TokenData::Sym(sym) => Value::Sym(sym.to_string()),
+                TokenData::Sym(sym) => Value::sym(sym.to_string()),
                 TokenData::LeftParen => self.read_list()?,
                 TokenData::RightParen => return Err(Error::unexpected_char(')')),
                 TokenData::Dot => return Err(Error::unexpected_char('.')),

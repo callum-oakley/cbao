@@ -1,5 +1,12 @@
 use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
+#[derive(Debug)]
+pub struct Closure {
+    params: Value,
+    body: Value,
+    env: Env,
+}
+
 #[derive(Debug, Clone)]
 pub enum Primitive {
     Cons,
@@ -8,39 +15,87 @@ pub enum Primitive {
     Add,
     Mul,
     Sub,
+    Div,
     Eq,
+}
+
+#[derive(Debug, Clone)]
+pub struct Pair(Value, Value);
+
+#[derive(Debug, Clone)]
+pub enum Proc {
+    Closure(Rc<Closure>),
+    Primitive(Primitive),
 }
 
 #[derive(Debug, Clone)]
 pub enum Value {
     Nil,
-    Bool(bool),
     Int(i32),
-    Sym(String),
-    Pair(Rc<Value>, Rc<Value>),
-    Function {
-        params: Rc<Value>,
-        body: Rc<Value>,
-        env: Env,
-    },
-    Primitive(Primitive),
+    Sym(Rc<String>),
+    Pair(Rc<Pair>),
+    Proc(Proc),
+}
+
+impl Value {
+    pub fn cons(x: Value, y: Value) -> Value {
+        Value::Pair(Rc::new(Pair(x, y)))
+    }
+
+    pub fn sym(s: String) -> Value {
+        Value::Sym(Rc::new(s))
+    }
+
+    pub fn primitive(p: Primitive) -> Value {
+        Value::Proc(Proc::Primitive(p))
+    }
+}
+
+impl Pair {
+    pub fn car(&self) -> &Value {
+        let Pair(ref x, _) = self;
+        x
+    }
+
+    pub fn cdr(&self) -> &Value {
+        let Pair(_, ref y) = self;
+        y
+    }
 }
 
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Value::Nil => write!(f, "nil"),
-            Value::Bool(bool) => write!(f, "{}", bool),
             Value::Int(int) => write!(f, "{}", int),
             Value::Sym(sym) => write!(f, "{}", sym),
-            Value::Pair(car, cdr) => write!(f, "({car} . {cdr})"),
-            Value::Function { .. } => write!(f, "<function>"),
-            Value::Primitive(p) => write!(f, "<primitive {:?}>", p),
+            Value::Pair(ref pair) => {
+                let mut pair = pair;
+                write!(f, "(")?;
+                loop {
+                    write!(f, "{}", pair.car())?;
+                    match pair.cdr() {
+                        Value::Nil => {
+                            break;
+                        }
+                        Value::Pair(p) => {
+                            write!(f, " ")?;
+                            pair = p;
+                        }
+                        _ => {
+                            write!(f, " . {}", pair.cdr())?;
+                            break;
+                        }
+                    }
+                }
+                write!(f, ")")
+            }
+            Value::Proc(_) => write!(f, "<proc>"),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct EnvData {
     frame: HashMap<String, Value>,
     outer: Option<Env>,
@@ -54,15 +109,13 @@ impl Env {
         Env(Rc::new(RefCell::new(EnvData {
             frame: vec![
                 ("nil".to_string(), Value::Nil),
-                ("true".to_string(), Value::Bool(true)),
-                ("false".to_string(), Value::Bool(false)),
-                ("cons".to_string(), Value::Primitive(Primitive::Cons)),
-                ("car".to_string(), Value::Primitive(Primitive::Car)),
-                ("cdr".to_string(), Value::Primitive(Primitive::Cdr)),
-                ("+".to_string(), Value::Primitive(Primitive::Add)),
-                ("*".to_string(), Value::Primitive(Primitive::Mul)),
-                ("-".to_string(), Value::Primitive(Primitive::Sub)),
-                ("=".to_string(), Value::Primitive(Primitive::Eq)),
+                ("cons".to_string(), Value::primitive(Primitive::Cons)),
+                ("car".to_string(), Value::primitive(Primitive::Car)),
+                ("cdr".to_string(), Value::primitive(Primitive::Cdr)),
+                ("+".to_string(), Value::primitive(Primitive::Add)),
+                ("*".to_string(), Value::primitive(Primitive::Mul)),
+                ("-".to_string(), Value::primitive(Primitive::Sub)),
+                ("=".to_string(), Value::primitive(Primitive::Eq)),
             ]
             .into_iter()
             .collect(),

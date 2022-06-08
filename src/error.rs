@@ -6,8 +6,8 @@ pub enum ErrorData {
     ParseInt(String, std::num::ParseIntError),
     UnexpectedChar(char),
     UnexpectedEof,
-    UnknownSym(String),
-    Function(Value),
+    UnknownSym(Value),
+    Proc(Value),
     Cast(Value, String),
     Todo(String),
 }
@@ -19,9 +19,9 @@ pub struct Error {
 }
 
 impl Error {
-    pub fn parse_int(s: String, err: std::num::ParseIntError) -> Error {
+    pub fn parse_int(s: &str, err: std::num::ParseIntError) -> Error {
         Error {
-            data: ErrorData::ParseInt(s, err),
+            data: ErrorData::ParseInt(s.to_string(), err),
             source: None,
         }
     }
@@ -40,30 +40,30 @@ impl Error {
         }
     }
 
-    pub fn unknown_sym(sym: String) -> Error {
+    pub fn unknown_sym(sym: Value) -> Error {
         Error {
             data: ErrorData::UnknownSym(sym),
             source: None,
         }
     }
 
-    pub fn function(value: Value) -> Error {
+    pub fn proc(value: Value) -> Error {
         Error {
-            data: ErrorData::Function(value),
+            data: ErrorData::Proc(value),
             source: None,
         }
     }
 
-    pub fn cast(v: Value, t: String) -> Error {
+    pub fn cast(v: Value, t: &str) -> Error {
         Error {
-            data: ErrorData::Cast(v, t),
+            data: ErrorData::Cast(v, t.to_string()),
             source: None,
         }
     }
 
-    pub fn todo(msg: String) -> Error {
+    pub fn todo(msg: &str) -> Error {
         Error {
-            data: ErrorData::Todo(msg),
+            data: ErrorData::Todo(msg.to_string()),
             source: None,
         }
     }
@@ -93,7 +93,7 @@ impl std::fmt::Display for Error {
             ErrorData::UnexpectedChar(c) => write!(f, "unexpected char '{c}'"),
             ErrorData::UnexpectedEof => write!(f, "unexpected end of input"),
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
-            ErrorData::Function(value) => write!(f, "in function '{value}'"),
+            ErrorData::Proc(value) => write!(f, "in proc '{value}'"),
             ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
             ErrorData::Todo(msg) => write!(f, "TODO {msg}"),
         }
