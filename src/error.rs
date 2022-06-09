@@ -48,7 +48,7 @@ impl Error {
         }
     }
 
-    pub fn proc(value: Value) -> Error {
+    pub fn function(value: Value) -> Error {
         Error {
             data: ErrorData::Fn(value),
             source: None,
@@ -101,7 +101,7 @@ impl std::fmt::Display for Error {
             ErrorData::UnexpectedChar(c) => write!(f, "unexpected char '{c}'"),
             ErrorData::UnexpectedEof => write!(f, "unexpected end of input"),
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
-            ErrorData::Fn(value) => write!(f, "in fn '{value}'"),
+            ErrorData::Fn(value) => write!(f, "in function '{value}'"),
             ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
             ErrorData::TooManyArgs(n) => write!(f, "too many args, expected at most {n}"),
             ErrorData::Todo(msg) => write!(f, "TODO {msg}"),
@@ -123,11 +123,12 @@ impl std::error::Error for Error {
 }
 
 pub fn report(mut err: &(dyn std::error::Error)) {
-    eprintln!("{}", err);
+    let mut msg = format!("{err}");
     while let Some(e) = err.source() {
         err = e;
-        eprintln!("{}", err);
+        msg = format!("{err}\n{msg}");
     }
+    eprintln!("{msg}");
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

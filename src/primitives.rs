@@ -1,11 +1,4 @@
-use {
-    crate::{
-        args, cast,
-        error::{Error, Result},
-        value::{Env, Pair, Primitive, Value},
-    },
-    std::rc::Rc,
-};
+use crate::{args, cast, error::Result, value::Value};
 
 pub fn cons(args: &Value) -> Result<Value> {
     let (x, y) = args::get_2(args)?;
@@ -40,8 +33,8 @@ pub fn div(args: &Value) -> Result<Value> {
     Ok(Value::Int(cast::int(x)? / cast::int(y)?))
 }
 
-pub fn eq(args: &Value) -> Result<Value> {
-    let (x, y) = args::get_2(args)?;
+pub fn eq(_args: &Value) -> Result<Value> {
     todo!()
+    // let (x, y) = args::get_2(args)?;
     // Ok(if x == y { x } else { Value::Nil })
 }

@@ -2,7 +2,7 @@ use {
     crate::{
         cast,
         error::{Error, Result},
-        value::{Env, Pair, Primitive, Value},
+        value::Value,
     },
     std::collections::HashMap,
 };
@@ -44,11 +44,7 @@ fn bind_list(
     }
 }
 
-pub fn bind(
-    mut params: &Value,
-    mut args: &Value,
-    frame: &mut HashMap<String, Value>,
-) -> Result<()> {
+pub fn bind(params: &Value, args: &Value, frame: &mut HashMap<String, Value>) -> Result<()> {
     match params {
         Value::Sym(sym) => {
             frame.insert(sym.to_string(), args.clone());

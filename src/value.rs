@@ -101,7 +101,10 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
-            Value::Fn(_) => write!(f, "<fn>"),
+            Value::Fn(v) => match v {
+                Fn::Closure(_) => write!(f, "<closure>"),
+                Fn::Primitive(p) => write!(f, "<primitive: {:?}>", p),
+            },
         }
     }
 }
@@ -126,6 +129,7 @@ impl Env {
                 ("+".to_string(), Value::primitive(Primitive::Add)),
                 ("*".to_string(), Value::primitive(Primitive::Mul)),
                 ("-".to_string(), Value::primitive(Primitive::Sub)),
+                ("/".to_string(), Value::primitive(Primitive::Div)),
                 ("=".to_string(), Value::primitive(Primitive::Eq)),
             ]
             .into_iter()

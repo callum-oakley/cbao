@@ -83,6 +83,7 @@ pub fn eval(value: &Value, env: &Env) -> Result<Value> {
                 }
             };
             apply(&eval(car, env)?, &eval_list(pair.cdr(), env)?)
+                .map_err(|err| Error::function(car.clone()).source(err))
         }
         _ => Ok(value.clone()),
     }

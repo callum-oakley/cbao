@@ -1,9 +1,6 @@
-use {
-    crate::{
-        error::{Error, Result},
-        value::{Env, Pair, Primitive, Value},
-    },
-    std::rc::Rc,
+use crate::{
+    error::{Error, Result},
+    value::{Pair, Value},
 };
 
 pub fn int(v: &Value) -> Result<&i32> {

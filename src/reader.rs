@@ -22,7 +22,7 @@ enum TokenData<'a> {
 #[derive(Debug, Clone)]
 struct Token<'a> {
     data: TokenData<'a>,
-    line_no: usize,
+    _line_no: usize,
 }
 
 struct Tokens<'a> {
@@ -71,7 +71,7 @@ impl<'a> Tokens<'a> {
             .parse()
             .map(|int| Token {
                 data: TokenData::Int(int),
-                line_no: self.line_no,
+                _line_no: self.line_no,
             })
             .map_err(|err| Error::parse_int(&self.source[offset..self.end()], err))
     }
@@ -82,7 +82,7 @@ impl<'a> Tokens<'a> {
         }
         Token {
             data: TokenData::Sym(&self.source[offset..self.end()]),
-            line_no: self.line_no,
+            _line_no: self.line_no,
         }
     }
 }
@@ -104,35 +104,35 @@ impl<'a> Iterator for Tokens<'a> {
             Ok(match c {
                 '(' => Token {
                     data: TokenData::LeftParen,
-                    line_no: self.line_no,
+                    _line_no: self.line_no,
                 },
                 ')' => Token {
                     data: TokenData::RightParen,
-                    line_no: self.line_no,
+                    _line_no: self.line_no,
                 },
                 '.' => Token {
                     data: TokenData::Dot,
-                    line_no: self.line_no,
+                    _line_no: self.line_no,
                 },
                 '\'' => Token {
                     data: TokenData::Quote,
-                    line_no: self.line_no,
+                    _line_no: self.line_no,
                 },
                 '`' => Token {
                     data: TokenData::Quasiquote,
-                    line_no: self.line_no,
+                    _line_no: self.line_no,
                 },
                 '~' => {
                     if self.peek_char_is(|c| c == '@') {
                         self.next_char();
                         Token {
                             data: TokenData::SpliceUnquote,
-                            line_no: self.line_no,
+                            _line_no: self.line_no,
                         }
                     } else {
                         Token {
                             data: TokenData::Unquote,
-                            line_no: self.line_no,
+                            _line_no: self.line_no,
                         }
                     }
                 }
