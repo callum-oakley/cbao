@@ -8,10 +8,55 @@ use {
     std::collections::HashMap,
 };
 
+fn quasiquote(arg: &Value) -> Result<Value> {
+    match arg {
+        Value::Sym(_) => Ok(Value::cons(
+            Value::sym("quote".to_string()),
+            Value::cons(arg.clone(), Value::Nil),
+        )),
+        Value::Pair(pair) => {
+            let car = pair.car();
+            match car {
+                Value::Sym(sym) if sym.as_str() == "unquote" => {
+                    return Ok(cast::car(pair.cdr())?.clone());
+                }
+                Value::Pair(inner_pair) => {
+                    if let Value::Sym(sym) = inner_pair.car() {
+                        if sym.as_str() == "splice-unquote" {
+                            return Ok(Value::cons(
+                                Value::sym("concat".to_string()),
+                                Value::cons(
+                                    cast::car(inner_pair.cdr())?.clone(),
+                                    Value::cons(quasiquote(pair.cdr())?, Value::Nil),
+                                ),
+                            ));
+                        }
+                    }
+                }
+                _ => (),
+            }
+            Ok(Value::cons(
+                Value::sym("cons".to_string()),
+                Value::cons(
+                    quasiquote(car)?,
+                    Value::cons(quasiquote(pair.cdr())?, Value::Nil),
+                ),
+            ))
+        }
+        _ => Ok(arg.clone()),
+    }
+}
+
 fn apply_closure(closure: &Closure, args: &Value) -> Result<Value> {
     let mut frame = HashMap::new();
     args::bind(&closure.params, args, &mut frame)?;
-    eval(cast::car(&closure.body)?, &closure.env.extend(frame))
+    let env = closure.env.extend(frame);
+    let mut body = &closure.body;
+    while !cast::cdr(body)?.is_nil() {
+        eval(cast::car(body)?, &env)?;
+        body = cast::cdr(body)?;
+    }
+    eval(cast::car(body)?, &env)
 }
 
 fn apply(function: &Value, args: &Value) -> Result<Value> {
@@ -81,6 +126,8 @@ pub fn eval(value: &Value, env: &Env) -> Result<Value> {
                     "def" => return eval_def(pair.cdr(), env),
                     "fn" => return eval_fn(pair.cdr(), env),
                     "if" => return eval_if(pair.cdr(), env),
+                    "quote" => return Ok(args::arg_0(pair.cdr())?.clone()),
+                    "quasiquote" => return eval(&quasiquote(args::arg_0(pair.cdr())?)?, env),
                     _ => (),
                 }
             };
