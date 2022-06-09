@@ -8,38 +8,10 @@ use {
     std::collections::HashMap,
 };
 
-// TODO destructuring
-fn apply_closure(closure: &Closure, mut args: &Value) -> Result<Value> {
+fn apply_closure(closure: &Closure, args: &Value) -> Result<Value> {
     let mut frame = HashMap::new();
-    let mut params = &closure.params;
-    let mut param_count = 0;
-    while !params.is_nil() {
-        match params {
-            Value::Sym(sym) => {
-                frame.insert(sym.to_string(), args.clone());
-                args = &Value::Nil;
-                break;
-            }
-            _ => {
-                if args.is_nil() {
-                    frame.insert(cast::sym(cast::car(params)?)?.to_string(), Value::Nil);
-                } else {
-                    frame.insert(
-                        cast::sym(cast::car(params)?)?.to_string(),
-                        cast::car(args)?.clone(),
-                    );
-                    args = cast::cdr(args)?;
-                }
-                params = cast::cdr(params)?;
-                param_count += 1;
-            }
-        }
-    }
-    if !args.is_nil() {
-        Err(Error::too_many_args(param_count))
-    } else {
-        eval(cast::car(&closure.body)?, &closure.env.extend(frame))
-    }
+    args::bind(&closure.params, args, &mut frame)?;
+    eval(cast::car(&closure.body)?, &closure.env.extend(frame))
 }
 
 fn apply(function: &Value, args: &Value) -> Result<Value> {

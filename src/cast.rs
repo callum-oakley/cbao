@@ -42,3 +42,19 @@ pub fn cadr(v: &Value) -> Result<&Value> {
 pub fn cddr(v: &Value) -> Result<&Value> {
     cdr(cdr(v)?)
 }
+
+pub fn car_or_nil(v: &Value) -> Result<&Value> {
+    match v {
+        Value::Nil => Ok(&v),
+        Value::Pair(pair) => Ok(pair.car()),
+        _ => Err(Error::cast(v, "a pair or nil")),
+    }
+}
+
+pub fn cdr_or_nil(v: &Value) -> Result<&Value> {
+    match v {
+        Value::Nil => Ok(&v),
+        Value::Pair(pair) => Ok(pair.cdr()),
+        _ => Err(Error::cast(v, "a pair or nil")),
+    }
+}

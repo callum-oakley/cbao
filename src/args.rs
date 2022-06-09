@@ -1,6 +1,10 @@
-use crate::{
-    error::{Error, Result},
-    value::{Env, Pair, Primitive, Value},
+use {
+    crate::{
+        cast,
+        error::{Error, Result},
+        value::{Env, Pair, Primitive, Value},
+    },
+    std::collections::HashMap,
 };
 
 pub fn get_1(args: &Value) -> Result<&Value> {
@@ -20,5 +24,36 @@ pub fn get_2(args: &Value) -> Result<(&Value, &Value)> {
             _ => Err(Error::too_many_args(2)),
         },
         _ => Ok((&Value::Nil, &Value::Nil)),
+    }
+}
+
+fn bind_list(
+    mut params: &Value,
+    mut args: &Value,
+    frame: &mut HashMap<String, Value>,
+) -> Result<()> {
+    loop {
+        bind(cast::car(params)?, cast::car_or_nil(args)?, frame)?;
+        params = cast::cdr(params)?;
+        args = cast::cdr_or_nil(args)?;
+        match params {
+            Value::Nil => return Ok(()),
+            Value::Sym(_) => return bind(params, args, frame),
+            _ => (),
+        }
+    }
+}
+
+pub fn bind(
+    mut params: &Value,
+    mut args: &Value,
+    frame: &mut HashMap<String, Value>,
+) -> Result<()> {
+    match params {
+        Value::Sym(sym) => {
+            frame.insert(sym.to_string(), args.clone());
+            Ok(())
+        }
+        _ => bind_list(params, args, frame),
     }
 }
