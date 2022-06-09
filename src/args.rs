@@ -9,7 +9,7 @@ use {
 
 pub fn arg_tail(v: &Value) -> Result<&Value> {
     match v {
-        Value::Nil => Ok(&v),
+        Value::Nil => Ok(v),
         Value::Pair(pair) => Ok(pair.cdr()),
         _ => Err(Error::cast(v, "a pair or nil")),
     }
@@ -17,7 +17,7 @@ pub fn arg_tail(v: &Value) -> Result<&Value> {
 
 pub fn arg_0(v: &Value) -> Result<&Value> {
     match v {
-        Value::Nil => Ok(&v),
+        Value::Nil => Ok(v),
         Value::Pair(pair) => Ok(pair.car()),
         _ => Err(Error::cast(v, "a pair or nil")),
     }

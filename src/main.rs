@@ -17,7 +17,7 @@ use {
 
 fn run_source(source: &str, env: &Env) -> Result<()> {
     for value in reader::read(source) {
-        println!("{}", eval::eval(&value?, &env)?);
+        println!("{}", eval::eval(&value?, env)?);
     }
     Ok(())
 }

@@ -73,7 +73,7 @@ fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
 
 pub fn eval(value: &Value, env: &Env) -> Result<Value> {
     match value {
-        Value::Sym(sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
+        Value::Sym(sym) => env.get(sym).ok_or_else(|| Error::unknown_sym(value)),
         Value::Pair(pair) => {
             let car = pair.car();
             if let Value::Sym(sym) = car {

@@ -55,10 +55,7 @@ impl Value {
     }
 
     pub fn is_nil(&self) -> bool {
-        match self {
-            Value::Nil => true,
-            _ => false,
-        }
+        matches!(self, Value::Nil)
     }
 }
 

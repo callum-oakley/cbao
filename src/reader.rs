@@ -189,12 +189,13 @@ impl<'a> Reader<'a> {
             Ok(Value::Nil)
         } else if self.peek_token_is(TokenData::Dot) {
             self.consume(TokenData::Dot)?;
-            let res = self.next().unwrap_or(Err(Error::unexpected_eof()));
+            let res = self.next().unwrap_or_else(|| Err(Error::unexpected_eof()));
             self.consume(TokenData::RightParen)?;
             res
         } else {
             Ok(Value::cons(
-                self.next().unwrap_or(Err(Error::unexpected_eof()))?,
+                self.next()
+                    .unwrap_or_else(|| Err(Error::unexpected_eof()))?,
                 self.read_list()?,
             ))
         }
