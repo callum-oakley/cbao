@@ -1,4 +1,5 @@
 use crate::{
+    cast,
     error::{Error, Result},
     primitives,
     value::{Env, Primitive, Proc, Value},
@@ -31,10 +32,33 @@ fn eval_list(value: &Value, env: &Env) -> Result<Value> {
     }
 }
 
+fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
+    loop {
+        if args.is_nil() {
+            return Ok(Value::Nil);
+        } else if cast::cdr(args)?.is_nil() {
+            return eval(cast::car(args)?, env);
+        } else if !eval(cast::car(args)?, env)?.is_nil() {
+            return eval(cast::cadr(args)?, env);
+        } else {
+            args = cast::cddr(args)?;
+        }
+    }
+}
+
 pub fn eval(value: &Value, env: &Env) -> Result<Value> {
     match value {
         Value::Sym(sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
-        Value::Pair(pair) => apply(&eval(pair.car(), env)?, &eval_list(pair.cdr(), env)?),
+        Value::Pair(pair) => {
+            let car = pair.car();
+            if let Value::Sym(sym) = car {
+                match sym.as_str() {
+                    "if" => return eval_if(pair.cdr(), env),
+                    _ => (),
+                }
+            };
+            apply(&eval(car, env)?, &eval_list(pair.cdr(), env)?)
+        }
         _ => Ok(value.clone()),
     }
 }

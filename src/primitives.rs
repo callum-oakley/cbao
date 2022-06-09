@@ -1,24 +1,11 @@
 use {
     crate::{
+        cast,
         error::{Error, Result},
         value::{Env, Pair, Primitive, Proc, Value},
     },
     std::rc::Rc,
 };
-
-fn as_int(v: &Value) -> Result<&i32> {
-    match v {
-        Value::Int(int) => Ok(int),
-        _ => Err(Error::cast(v, "an int")),
-    }
-}
-
-fn as_pair(v: &Value) -> Result<&Pair> {
-    match v {
-        Value::Pair(pair) => Ok(pair),
-        _ => Err(Error::cast(v, "a pair")),
-    }
-}
 
 fn args_1(args: &Value) -> Result<&Value> {
     match args {
@@ -46,31 +33,31 @@ pub fn cons(args: &Value) -> Result<Value> {
 }
 
 pub fn car(args: &Value) -> Result<Value> {
-    Ok(as_pair(args_1(args)?)?.car().clone())
+    Ok(cast::car(args_1(args)?)?.clone())
 }
 
 pub fn cdr(args: &Value) -> Result<Value> {
-    Ok(as_pair(args_1(args)?)?.cdr().clone())
+    Ok(cast::cdr(args_1(args)?)?.clone())
 }
 
 pub fn add(args: &Value) -> Result<Value> {
     let (x, y) = args_2(args)?;
-    Ok(Value::Int(as_int(x)? + as_int(y)?))
+    Ok(Value::Int(cast::int(x)? + cast::int(y)?))
 }
 
 pub fn mul(args: &Value) -> Result<Value> {
     let (x, y) = args_2(args)?;
-    Ok(Value::Int(as_int(x)? * as_int(y)?))
+    Ok(Value::Int(cast::int(x)? * cast::int(y)?))
 }
 
 pub fn sub(args: &Value) -> Result<Value> {
     let (x, y) = args_2(args)?;
-    Ok(Value::Int(as_int(x)? - as_int(y)?))
+    Ok(Value::Int(cast::int(x)? - cast::int(y)?))
 }
 
 pub fn div(args: &Value) -> Result<Value> {
     let (x, y) = args_2(args)?;
-    Ok(Value::Int(as_int(x)? / as_int(y)?))
+    Ok(Value::Int(cast::int(x)? / cast::int(y)?))
 }
 
 pub fn eq(args: &Value) -> Result<Value> {

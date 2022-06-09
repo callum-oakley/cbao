@@ -1,3 +1,4 @@
+mod cast;
 mod error;
 mod eval;
 mod primitives;

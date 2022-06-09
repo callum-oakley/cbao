@@ -49,6 +49,13 @@ impl Value {
     pub fn primitive(p: Primitive) -> Value {
         Value::Proc(Proc::Primitive(p))
     }
+
+    pub fn is_nil(&self) -> bool {
+        match self {
+            Value::Nil => true,
+            _ => false,
+        }
+    }
 }
 
 impl Pair {
