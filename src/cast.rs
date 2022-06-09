@@ -13,6 +13,13 @@ pub fn int(v: &Value) -> Result<&i32> {
     }
 }
 
+pub fn sym(v: &Value) -> Result<&str> {
+    match v {
+        Value::Sym(sym) => Ok(sym),
+        _ => Err(Error::cast(v, "a sym")),
+    }
+}
+
 pub fn pair(v: &Value) -> Result<&Pair> {
     match v {
         Value::Pair(pair) => Ok(pair),

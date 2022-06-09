@@ -1,5 +1,5 @@
 use crate::{
-    cast,
+    args, cast,
     error::{Error, Result},
     primitives,
     value::{Env, Primitive, Proc, Value},
@@ -46,6 +46,12 @@ fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
     }
 }
 
+fn eval_def(args: &Value, env: &Env) -> Result<Value> {
+    let (x, y) = args::get_2(args)?;
+    env.set(cast::sym(x)?.to_string(), eval(y, env)?);
+    Ok(Value::Nil)
+}
+
 pub fn eval(value: &Value, env: &Env) -> Result<Value> {
     match value {
         Value::Sym(sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
@@ -54,6 +60,7 @@ pub fn eval(value: &Value, env: &Env) -> Result<Value> {
             if let Value::Sym(sym) = car {
                 match sym.as_str() {
                     "if" => return eval_if(pair.cdr(), env),
+                    "def" => return eval_def(pair.cdr(), env),
                     _ => (),
                 }
             };

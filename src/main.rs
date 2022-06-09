@@ -1,3 +1,4 @@
+mod args;
 mod cast;
 mod error;
 mod eval;
@@ -14,16 +15,15 @@ use {
     value::Env,
 };
 
-fn run_source(source: &str) -> Result<()> {
-    let prelude = Env::prelude();
+fn run_source(source: &str, env: &Env) -> Result<()> {
     for value in reader::read(source) {
-        println!("{}", eval::eval(&value?, &prelude)?);
+        println!("{}", eval::eval(&value?, &env)?);
     }
     Ok(())
 }
 
 fn run_file(path: &str) -> Result<()> {
-    run_source(&fs::read_to_string(path)?)
+    run_source(&fs::read_to_string(path)?, &Env::prelude())
 }
 
 fn prompt(s: &str) -> Result<()> {
@@ -33,11 +33,12 @@ fn prompt(s: &str) -> Result<()> {
 }
 
 fn run_repl() -> Result<()> {
+    let env = Env::prelude();
     let mut input = String::new();
     prompt("\n> ")?;
     for line in io::stdin().lock().lines() {
         input += &line?;
-        match run_source(&input) {
+        match run_source(&input, &env) {
             Err(err) => {
                 if let ErrorData::UnexpectedEof = err.data {
                     input.push('\n');
@@ -60,7 +61,7 @@ fn run() -> Result<()> {
         1 => run_repl(),
         2 => run_file(&args[1]),
         // assumes -e <form> for now
-        _ => run_source(&args[2]),
+        _ => run_source(&args[2], &Env::prelude()),
     }
 }
 
