@@ -1,14 +1,51 @@
-use crate::{
-    args, cast,
-    error::{Error, Result},
-    primitives,
-    value::{Env, Primitive, Proc, Value},
+use {
+    crate::{
+        args, cast,
+        error::{Error, Result},
+        primitives,
+        value::{Closure, Env, Fn, Primitive, Value},
+    },
+    std::collections::HashMap,
 };
 
-fn apply(proc: &Value, args: &Value) -> Result<Value> {
-    match proc {
-        Value::Proc(Proc::Closure(closure)) => todo!(),
-        Value::Proc(Proc::Primitive(primitive)) => match primitive {
+// TODO destructuring
+fn apply_closure(closure: &Closure, mut args: &Value) -> Result<Value> {
+    let mut frame = HashMap::new();
+    let mut params = &closure.params;
+    let mut param_count = 0;
+    while !params.is_nil() {
+        match params {
+            Value::Sym(sym) => {
+                frame.insert(sym.to_string(), args.clone());
+                args = &Value::Nil;
+                break;
+            }
+            _ => {
+                if args.is_nil() {
+                    frame.insert(cast::sym(cast::car(params)?)?.to_string(), Value::Nil);
+                } else {
+                    frame.insert(
+                        cast::sym(cast::car(params)?)?.to_string(),
+                        cast::car(args)?.clone(),
+                    );
+                    args = cast::cdr(args)?;
+                }
+                params = cast::cdr(params)?;
+                param_count += 1;
+            }
+        }
+    }
+    if !args.is_nil() {
+        Err(Error::too_many_args(param_count))
+    } else {
+        eval(cast::car(&closure.body)?, &closure.env.extend(frame))
+    }
+}
+
+fn apply(function: &Value, args: &Value) -> Result<Value> {
+    match function {
+        Value::Fn(Fn::Closure(closure)) => apply_closure(closure, args),
+        Value::Fn(Fn::Primitive(primitive)) => match primitive {
             Primitive::Cons => primitives::cons(args),
             Primitive::Car => primitives::car(args),
             Primitive::Cdr => primitives::cdr(args),
@@ -18,7 +55,7 @@ fn apply(proc: &Value, args: &Value) -> Result<Value> {
             Primitive::Div => primitives::div(args),
             Primitive::Eq => primitives::eq(args),
         },
-        _ => Err(Error::cast(proc, "a proc")),
+        _ => Err(Error::cast(function, "a fn")),
     }
 }
 
@@ -30,6 +67,20 @@ fn eval_list(value: &Value, env: &Env) -> Result<Value> {
         )),
         _ => eval(value, env),
     }
+}
+
+fn eval_def(args: &Value, env: &Env) -> Result<Value> {
+    let (x, y) = args::get_2(args)?;
+    env.set(cast::sym(x)?.to_string(), eval(y, env)?);
+    Ok(Value::Nil)
+}
+
+fn eval_fn(args: &Value, env: &Env) -> Result<Value> {
+    Ok(Value::closure(
+        cast::car(args)?.clone(),
+        cast::cdr(args)?.clone(),
+        env.clone(),
+    ))
 }
 
 fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
@@ -46,12 +97,6 @@ fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
     }
 }
 
-fn eval_def(args: &Value, env: &Env) -> Result<Value> {
-    let (x, y) = args::get_2(args)?;
-    env.set(cast::sym(x)?.to_string(), eval(y, env)?);
-    Ok(Value::Nil)
-}
-
 pub fn eval(value: &Value, env: &Env) -> Result<Value> {
     match value {
         Value::Sym(sym) => env.get(sym).ok_or(Error::unknown_sym(value)),
@@ -59,8 +104,9 @@ pub fn eval(value: &Value, env: &Env) -> Result<Value> {
             let car = pair.car();
             if let Value::Sym(sym) = car {
                 match sym.as_str() {
-                    "if" => return eval_if(pair.cdr(), env),
                     "def" => return eval_def(pair.cdr(), env),
+                    "fn" => return eval_fn(pair.cdr(), env),
+                    "if" => return eval_if(pair.cdr(), env),
                     _ => (),
                 }
             };

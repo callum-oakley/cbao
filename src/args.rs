@@ -1,6 +1,6 @@
 use crate::{
     error::{Error, Result},
-    value::{Env, Pair, Primitive, Proc, Value},
+    value::{Env, Pair, Primitive, Value},
 };
 
 pub fn get_1(args: &Value) -> Result<&Value> {

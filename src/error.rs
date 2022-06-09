@@ -7,7 +7,7 @@ pub enum ErrorData {
     UnexpectedChar(char),
     UnexpectedEof,
     UnknownSym(Value),
-    Proc(Value),
+    Fn(Value),
     Cast(Value, String),
     TooManyArgs(usize),
     Todo(String),
@@ -50,7 +50,7 @@ impl Error {
 
     pub fn proc(value: Value) -> Error {
         Error {
-            data: ErrorData::Proc(value),
+            data: ErrorData::Fn(value),
             source: None,
         }
     }
@@ -101,7 +101,7 @@ impl std::fmt::Display for Error {
             ErrorData::UnexpectedChar(c) => write!(f, "unexpected char '{c}'"),
             ErrorData::UnexpectedEof => write!(f, "unexpected end of input"),
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
-            ErrorData::Proc(value) => write!(f, "in proc '{value}'"),
+            ErrorData::Fn(value) => write!(f, "in fn '{value}'"),
             ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
             ErrorData::TooManyArgs(n) => write!(f, "too many args, expected at most {n}"),
             ErrorData::Todo(msg) => write!(f, "TODO {msg}"),

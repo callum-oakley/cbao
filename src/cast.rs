@@ -1,7 +1,7 @@
 use {
     crate::{
         error::{Error, Result},
-        value::{Env, Pair, Primitive, Proc, Value},
+        value::{Env, Pair, Primitive, Value},
     },
     std::rc::Rc,
 };

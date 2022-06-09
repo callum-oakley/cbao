@@ -2,9 +2,9 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug)]
 pub struct Closure {
-    params: Value,
-    body: Value,
-    env: Env,
+    pub params: Value,
+    pub body: Value,
+    pub env: Env,
 }
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ pub enum Primitive {
 pub struct Pair(Value, Value);
 
 #[derive(Debug, Clone)]
-pub enum Proc {
+pub enum Fn {
     Closure(Rc<Closure>),
     Primitive(Primitive),
 }
@@ -34,7 +34,7 @@ pub enum Value {
     Int(i32),
     Sym(Rc<String>),
     Pair(Rc<Pair>),
-    Proc(Proc),
+    Fn(Fn),
 }
 
 impl Value {
@@ -47,7 +47,11 @@ impl Value {
     }
 
     pub fn primitive(p: Primitive) -> Value {
-        Value::Proc(Proc::Primitive(p))
+        Value::Fn(Fn::Primitive(p))
+    }
+
+    pub fn closure(params: Value, body: Value, env: Env) -> Value {
+        Value::Fn(Fn::Closure(Rc::new(Closure { params, body, env })))
     }
 
     pub fn is_nil(&self) -> bool {
@@ -97,7 +101,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
-            Value::Proc(_) => write!(f, "<proc>"),
+            Value::Fn(_) => write!(f, "<fn>"),
         }
     }
 }

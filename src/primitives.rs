@@ -2,7 +2,7 @@ use {
     crate::{
         args, cast,
         error::{Error, Result},
-        value::{Env, Pair, Primitive, Proc, Value},
+        value::{Env, Pair, Primitive, Value},
     },
     std::rc::Rc,
 };
