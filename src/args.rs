@@ -7,24 +7,24 @@ use {
     std::collections::HashMap,
 };
 
-pub fn get_1(args: &Value) -> Result<&Value> {
-    match args {
-        Value::Pair(pair) => match pair.cdr() {
-            Value::Nil => Ok(pair.car()),
-            _ => Err(Error::too_many_args(1)),
-        },
-        _ => Ok(&Value::Nil),
+pub fn arg_tail(v: &Value) -> Result<&Value> {
+    match v {
+        Value::Nil => Ok(&v),
+        Value::Pair(pair) => Ok(pair.cdr()),
+        _ => Err(Error::cast(v, "a pair or nil")),
     }
 }
 
-pub fn get_2(args: &Value) -> Result<(&Value, &Value)> {
-    match args {
-        Value::Pair(pair) => match get_1(pair.cdr()) {
-            Ok(arg) => Ok((pair.car(), arg)),
-            _ => Err(Error::too_many_args(2)),
-        },
-        _ => Ok((&Value::Nil, &Value::Nil)),
+pub fn arg_0(v: &Value) -> Result<&Value> {
+    match v {
+        Value::Nil => Ok(&v),
+        Value::Pair(pair) => Ok(pair.car()),
+        _ => Err(Error::cast(v, "a pair or nil")),
     }
+}
+
+pub fn arg_1(v: &Value) -> Result<&Value> {
+    arg_0(arg_tail(v)?)
 }
 
 fn bind_list(
@@ -33,9 +33,9 @@ fn bind_list(
     frame: &mut HashMap<String, Value>,
 ) -> Result<()> {
     loop {
-        bind(cast::car(params)?, cast::car_or_nil(args)?, frame)?;
+        bind(cast::car(params)?, arg_0(args)?, frame)?;
         params = cast::cdr(params)?;
-        args = cast::cdr_or_nil(args)?;
+        args = arg_tail(args)?;
         match params {
             Value::Nil => return Ok(()),
             Value::Sym(_) => return bind(params, args, frame),

@@ -42,8 +42,10 @@ fn eval_list(value: &Value, env: &Env) -> Result<Value> {
 }
 
 fn eval_def(args: &Value, env: &Env) -> Result<Value> {
-    let (x, y) = args::get_2(args)?;
-    env.set(cast::sym(x)?.to_string(), eval(y, env)?);
+    env.set(
+        cast::sym(args::arg_0(args)?)?.to_string(),
+        eval(args::arg_1(args)?, env)?,
+    );
     Ok(Value::Nil)
 }
 
