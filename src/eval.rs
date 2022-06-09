@@ -17,7 +17,7 @@ fn apply(proc: &Value, args: &Value) -> Result<Value> {
             Primitive::Div => primitives::div(args),
             Primitive::Eq => primitives::eq(args),
         },
-        _ => Err(Error::cast(proc, "proc")),
+        _ => Err(Error::cast(proc, "a proc")),
     }
 }
 

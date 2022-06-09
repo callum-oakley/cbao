@@ -9,6 +9,7 @@ pub enum ErrorData {
     UnknownSym(Value),
     Proc(Value),
     Cast(Value, String),
+    TooManyArgs(usize),
     Todo(String),
 }
 
@@ -68,6 +69,13 @@ impl Error {
         }
     }
 
+    pub fn too_many_args(expected: usize) -> Error {
+        Error {
+            data: ErrorData::TooManyArgs(expected),
+            source: None,
+        }
+    }
+
     pub fn source(self, err: Error) -> Error {
         Error {
             data: self.data,
@@ -95,6 +103,7 @@ impl std::fmt::Display for Error {
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
             ErrorData::Proc(value) => write!(f, "in proc '{value}'"),
             ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
+            ErrorData::TooManyArgs(n) => write!(f, "too many args, expected at most {n}"),
             ErrorData::Todo(msg) => write!(f, "TODO {msg}"),
         }
     }
