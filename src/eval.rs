@@ -87,19 +87,18 @@ fn eval_list(value: &Value, env: &Env) -> Result<Value> {
 }
 
 fn eval_def(args: &Value, env: &Env) -> Result<Value> {
-    env.set(
-        cast::sym(args::arg_0(args)?)?.to_string(),
-        eval(args::arg_1(args)?, env)?,
-    );
+    match args::arg_0(args)? {
+        Value::Pair(pair) => env.set(
+            cast::sym(pair.car())?.to_string(),
+            eval_fn(pair.cdr(), args::arg_tail(args)?, env)?,
+        ),
+        v => env.set(cast::sym(v)?.to_string(), eval(args::arg_1(args)?, env)?),
+    };
     Ok(Value::Nil)
 }
 
-fn eval_fn(args: &Value, env: &Env) -> Result<Value> {
-    Ok(Value::closure(
-        cast::car(args)?.clone(),
-        cast::cdr(args)?.clone(),
-        env.clone(),
-    ))
+fn eval_fn(params: &Value, body: &Value, env: &Env) -> Result<Value> {
+    Ok(Value::closure(params.clone(), body.clone(), env.clone()))
 }
 
 fn eval_if(mut args: &Value, env: &Env) -> Result<Value> {
@@ -124,10 +123,10 @@ pub fn eval(value: &Value, env: &Env) -> Result<Value> {
             if let Value::Sym(sym) = car {
                 match sym.as_str() {
                     "def" => return eval_def(pair.cdr(), env),
-                    "fn" => return eval_fn(pair.cdr(), env),
+                    "fn" => return eval_fn(cast::car(pair.cdr())?, cast::cdr(pair.cdr())?, env),
                     "if" => return eval_if(pair.cdr(), env),
-                    "quote" => return Ok(args::arg_0(pair.cdr())?.clone()),
                     "quasiquote" => return eval(&quasiquote(args::arg_0(pair.cdr())?)?, env),
+                    "quote" => return Ok(args::arg_0(pair.cdr())?.clone()),
                     _ => (),
                 }
             };

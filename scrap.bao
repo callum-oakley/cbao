@@ -1,14 +1,12 @@
 ;; We need concat for macro expansion. We'll redefine this to take any number
 ;; of args later. TODO
-(def concat
-  (fn (xs ys)
-    (if xs
-      (cons (car xs) (concat (cdr xs) ys))
-      ys)))
+(def (concat xs ys)
+  (if xs
+    (cons (car xs) (concat (cdr xs) ys))
+    ys))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def list
-  (fn x x))
+(def (list x) x)
 
 `(+ ~@(list 1 2) 3)
