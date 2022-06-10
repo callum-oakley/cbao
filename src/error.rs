@@ -6,7 +6,7 @@ pub enum ErrorData {
     ParseInt(String, std::num::ParseIntError),
     UnexpectedChar(char),
     UnexpectedEof,
-    UnknownSym(Value),
+    UnknownSym(String),
     Fn(Value),
     Cast(Value, String),
     Todo(String),
@@ -40,9 +40,9 @@ impl Error {
         }
     }
 
-    pub fn unknown_sym(sym: &Value) -> Error {
+    pub fn unknown_sym(sym: &str) -> Error {
         Error {
-            data: ErrorData::UnknownSym(sym.clone()),
+            data: ErrorData::UnknownSym(sym.to_string()),
             source: None,
         }
     }

@@ -46,6 +46,7 @@ fn bind_list(
 
 pub fn bind(params: &Value, args: &Value, frame: &mut HashMap<String, Value>) -> Result<()> {
     match params {
+        Value::Nil => Ok(()),
         Value::Sym(sym) => {
             frame.insert(sym.to_string(), args.clone());
             Ok(())

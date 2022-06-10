@@ -34,7 +34,7 @@ pub enum Value {
     Int(i32),
     Sym(Rc<String>),
     Pair(Rc<Pair>),
-    Fn(Fn),
+    Fn(Fn, bool),
 }
 
 impl Value {
@@ -47,11 +47,15 @@ impl Value {
     }
 
     pub fn primitive(p: Primitive) -> Value {
-        Value::Fn(Fn::Primitive(p))
+        Value::Fn(Fn::Primitive(p), false)
     }
 
     pub fn closure(params: Value, body: Value, env: Env) -> Value {
-        Value::Fn(Fn::Closure(Rc::new(Closure { params, body, env })))
+        Value::Fn(Fn::Closure(Rc::new(Closure { params, body, env })), false)
+    }
+
+    pub fn as_macro(f: Fn) -> Value {
+        Value::Fn(f, true)
     }
 
     pub fn is_nil(&self) -> bool {
@@ -98,7 +102,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, ")")
             }
-            Value::Fn(v) => match v {
+            Value::Fn(v, _) => match v {
                 Fn::Closure(_) => write!(f, "<closure>"),
                 Fn::Primitive(p) => write!(f, "<primitive: {:?}>", p),
             },

@@ -1,12 +1,45 @@
-;; We need concat for macro expansion. We'll redefine this to take any number
-;; of args later. TODO
-(def (concat xs ys)
+(def (list . xs)
+  xs)
+
+(def (reduce f init xs)
+  (def (loop acc xs)
+    (if xs
+      (loop (f acc (car xs)) (cdr xs))
+      acc))
+  (loop init xs))
+
+(def (reduce* f init xs)
   (if xs
-    (cons (car xs) (concat (cdr xs) ys))
-    ys))
+    (f (car xs) (reduce* f init (cdr xs)))
+    init))
+
+(def (map f xs)
+  (reduce* (fn (x acc) (cons (f x) acc)) nil xs))
+
+(def (reverse xs)
+  (reduce cons nil xs))
+
+(def (cat . xs)
+  (def (cat-2 xs ys)
+    (if xs
+      (cons (car xs) (cat (cdr xs) ys))
+      ys))
+  (reduce cat-2 nil xs))
+
+(defmacro (do . body)
+  `((fn () ~@body)))
+
+(defmacro (and x . xs)
+  (if xs
+    `(if ~x (and ~@xs))
+    x))
+
+(defmacro (or x . xs)
+  (if xs
+    `(if ~x ~x (or ~@xs))
+    x))
+
+(def (not x)
+  (if x nil 'true))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(def (list x) x)
-
-`(+ ~@(list 1 2) 3)

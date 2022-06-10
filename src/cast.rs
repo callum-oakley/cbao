@@ -1,6 +1,6 @@
 use crate::{
     error::{Error, Result},
-    value::{Pair, Value},
+    value::{Fn, Pair, Value},
 };
 
 pub fn int(v: &Value) -> Result<&i32> {
@@ -21,6 +21,13 @@ pub fn pair(v: &Value) -> Result<&Pair> {
     match v {
         Value::Pair(pair) => Ok(pair),
         _ => Err(Error::cast(v, "a pair")),
+    }
+}
+
+pub fn function(v: &Value) -> Result<&Fn> {
+    match v {
+        Value::Fn(f, _) => Ok(f),
+        _ => Err(Error::cast(v, "a function")),
     }
 }
 
