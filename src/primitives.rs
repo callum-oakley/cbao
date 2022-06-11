@@ -1,46 +1,52 @@
 use crate::{args, cast, error::Result, value::Value};
 
 pub fn cons(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     Ok(Value::cons(
-        args::arg_0(args)?.clone(),
-        args::arg_1(args)?.clone(),
+        cast::car(args)?.clone(),
+        cast::cadr(args)?.clone(),
     ))
 }
 
 pub fn car(args: &Value) -> Result<Value> {
-    Ok(cast::car(args::arg_0(args)?)?.clone())
+    args::arity(args, 1)?;
+    Ok(cast::car(cast::car(args)?)?.clone())
 }
 
 pub fn cdr(args: &Value) -> Result<Value> {
-    Ok(cast::cdr(args::arg_0(args)?)?.clone())
+    args::arity(args, 1)?;
+    Ok(cast::cdr(cast::car(args)?)?.clone())
 }
 
 pub fn add(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     Ok(Value::Int(
-        cast::int(args::arg_0(args)?)? + cast::int(args::arg_1(args)?)?,
+        cast::int(cast::car(args)?)? + cast::int(cast::cadr(args)?)?,
     ))
 }
 
 pub fn mul(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     Ok(Value::Int(
-        cast::int(args::arg_0(args)?)? * cast::int(args::arg_1(args)?)?,
+        cast::int(cast::car(args)?)? * cast::int(cast::cadr(args)?)?,
     ))
 }
 
 pub fn sub(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     Ok(Value::Int(
-        cast::int(args::arg_0(args)?)? - cast::int(args::arg_1(args)?)?,
+        cast::int(cast::car(args)?)? - cast::int(cast::cadr(args)?)?,
     ))
 }
 
 pub fn div(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     Ok(Value::Int(
-        cast::int(args::arg_0(args)?)? / cast::int(args::arg_1(args)?)?,
+        cast::int(cast::car(args)?)? / cast::int(cast::cadr(args)?)?,
     ))
 }
 
-pub fn eq(_args: &Value) -> Result<Value> {
+pub fn eq(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
     todo!()
-    // let (x, y) = args::get_2(args)?;
-    // Ok(if x == y { x } else { Value::Nil })
 }

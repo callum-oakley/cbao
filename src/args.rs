@@ -1,30 +1,26 @@
 use {
     crate::{
         cast,
-        error::{Error, Result},
+        error::{Error, ErrorData, Result},
         value::Value,
     },
     std::collections::HashMap,
 };
 
-pub fn arg_tail(v: &Value) -> Result<&Value> {
-    match v {
-        Value::Nil => Ok(v),
-        Value::Pair(pair) => Ok(pair.cdr()),
-        _ => Err(Error::cast(v, "a pair or nil")),
+pub fn arity(args: &Value, n: usize) -> Result<()> {
+    if n == 0 && args.is_nil() {
+        Ok(())
+    } else if n == 0 {
+        Err(Error::too_many_args(n))
+    } else if args.is_nil() {
+        Err(Error::too_few_args(n))
+    } else {
+        arity(cast::cdr(args)?, n - 1).map_err(|err| match err.data {
+            ErrorData::TooManyArgs(_) => Error::too_many_args(n),
+            ErrorData::TooFewArgs(_) => Error::too_few_args(n),
+            _ => err,
+        })
     }
-}
-
-pub fn arg_0(v: &Value) -> Result<&Value> {
-    match v {
-        Value::Nil => Ok(v),
-        Value::Pair(pair) => Ok(pair.car()),
-        _ => Err(Error::cast(v, "a pair or nil")),
-    }
-}
-
-pub fn arg_1(v: &Value) -> Result<&Value> {
-    arg_0(arg_tail(v)?)
 }
 
 fn bind_list(
@@ -33,9 +29,9 @@ fn bind_list(
     frame: &mut HashMap<String, Value>,
 ) -> Result<()> {
     loop {
-        bind(cast::car(params)?, arg_0(args)?, frame)?;
+        bind(cast::car(params)?, cast::car(args)?, frame)?;
         params = cast::cdr(params)?;
-        args = arg_tail(args)?;
+        args = cast::cdr(args)?;
         match params {
             Value::Nil => return Ok(()),
             Value::Sym(_) => return bind(params, args, frame),
@@ -51,6 +47,6 @@ pub fn bind(params: &Value, args: &Value, frame: &mut HashMap<String, Value>) ->
             frame.insert(sym.to_string(), args.clone());
             Ok(())
         }
-        _ => bind_list(params, args, frame),
+        _ => bind_list(params, args, frame).map_err(|err| Error::bind(params.clone()).source(err)),
     }
 }

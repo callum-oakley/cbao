@@ -87,25 +87,25 @@ fn eval_list(value: &Value, env: &Env) -> Result<Value> {
 }
 
 fn eval_def(args: &Value, env: &Env) -> Result<Value> {
-    match args::arg_0(args)? {
+    match cast::car(args)? {
         Value::Pair(pair) => env.set(
             cast::sym(pair.car())?.to_string(),
-            eval_fn(pair.cdr(), args::arg_tail(args)?, env)?,
+            eval_fn(pair.cdr(), cast::cdr(args)?, env)?,
         ),
         v => env.set(
             cast::sym(v)?.to_string(),
-            eval(args::arg_1(args)?.clone(), env)?,
+            eval(cast::cadr(args)?.clone(), env)?,
         ),
     };
     Ok(Value::Nil)
 }
 
 fn eval_defmacro(args: &Value, env: &Env) -> Result<Value> {
-    let arg_0 = args::arg_0(args)?;
+    let arg_0 = cast::car(args)?;
     env.set(
         cast::car(arg_0)?.to_string(),
         Value::as_macro(
-            cast::function(&eval_fn(cast::cdr(arg_0)?, args::arg_tail(args)?, env)?)?.clone(),
+            cast::function(&eval_fn(cast::cdr(arg_0)?, cast::cdr(args)?, env)?)?.clone(),
         ),
     );
     Ok(Value::Nil)
@@ -157,9 +157,9 @@ pub fn eval(mut value: Value, env: &Env) -> Result<Value> {
                     "defmacro" => return eval_defmacro(pair.cdr(), env),
                     "fn" => return eval_fn(cast::car(pair.cdr())?, cast::cdr(pair.cdr())?, env),
                     "if" => return eval_if(pair.cdr(), env),
-                    "quasiquote" => return eval(quasiquote(args::arg_0(pair.cdr())?)?, env),
-                    "quote" => return Ok(args::arg_0(pair.cdr())?.clone()),
-                    "macroexpand" => return macroexpand(args::arg_0(pair.cdr())?.clone(), env),
+                    "quasiquote" => return eval(quasiquote(cast::car(pair.cdr())?)?, env),
+                    "quote" => return Ok(cast::car(pair.cdr())?.clone()),
+                    "macroexpand" => return macroexpand(cast::car(pair.cdr())?.clone(), env),
                     _ => (),
                 }
             };

@@ -9,6 +9,9 @@ pub enum ErrorData {
     UnknownSym(String),
     Fn(Value),
     Cast(Value, String),
+    TooManyArgs(usize),
+    TooFewArgs(usize),
+    Bind(Value),
     Todo(String),
 }
 
@@ -61,6 +64,27 @@ impl Error {
         }
     }
 
+    pub fn too_many_args(n: usize) -> Error {
+        Error {
+            data: ErrorData::TooManyArgs(n),
+            source: None,
+        }
+    }
+
+    pub fn too_few_args(n: usize) -> Error {
+        Error {
+            data: ErrorData::TooFewArgs(n),
+            source: None,
+        }
+    }
+
+    pub fn bind(params: Value) -> Error {
+        Error {
+            data: ErrorData::Bind(params),
+            source: None,
+        }
+    }
+
     pub fn todo(msg: &str) -> Error {
         Error {
             data: ErrorData::Todo(msg.to_string()),
@@ -95,6 +119,9 @@ impl std::fmt::Display for Error {
             ErrorData::UnknownSym(sym) => write!(f, "unknown symbol '{sym}'"),
             ErrorData::Fn(value) => write!(f, "in function '{value}'"),
             ErrorData::Cast(v, t) => write!(f, "type error: '{v}' is not {t}"),
+            ErrorData::TooManyArgs(n) => write!(f, "too many args, expected {n}"),
+            ErrorData::TooFewArgs(n) => write!(f, "too few args, expected {n}"),
+            ErrorData::Bind(params) => write!(f, "expected args of the form {params}"),
             ErrorData::Todo(msg) => write!(f, "TODO {msg}"),
         }
     }

@@ -1,20 +1,21 @@
 (def (list . xs)
   xs)
 
-(def (reduce f init xs)
-  (def (loop acc xs)
-    (if xs
-      (loop (f acc (car xs)) (cdr xs))
-      acc))
-  (loop init xs))
-
-(def (reduce* f init xs)
+(def (reduce f acc xs)
   (if xs
-    (f (car xs) (reduce* f init (cdr xs)))
-    init))
+    (reduce f (f acc (car xs)) (cdr xs))
+    acc))
+
+(def (reduce* f acc xs)
+  (if xs
+    (f (car xs) (reduce* f acc (cdr xs)))
+    acc))
 
 (def (map f xs)
   (reduce* (fn (x acc) (cons (f x) acc)) nil xs))
+
+(def (filter f xs)
+  (reduce* (fn (x acc) (if (f x) (cons x acc) acc)) nil xs))
 
 (def (reverse xs)
   (reduce cons nil xs))
@@ -42,4 +43,49 @@
 (def (not x)
   (if x nil 'true))
 
+(def (chunks n xs)
+  (if xs
+    (cons (take n xs) (chunks n (drop n xs)))))
+
+;; (defmacro (let bindings . body)
+;;   `(do
+;;      ~@(map (fn ((k v)) (list 'def k v)) (chunks 2 bindings))
+;;      ~@body))
+
+;; Primitive + - / * are only defined for the arity-2 case
+
+(def +
+  (do
+    (def +prim +)
+    (fn xs (reduce +prim 0 xs))))
+
+(def *
+  (do
+    (def *prim *)
+    (fn xs (reduce *prim 1 xs))))
+
+(def -
+  (do (def -prim -)
+    (fn xs
+      (if xs
+        (if (cdr xs)
+          (reduce -prim (car xs) (cdr xs))
+          (-prim 0 (car xs)))
+        0))))
+
+(def /
+  (do (def /prim /)
+    (fn xs
+      (if xs
+        (if (cdr xs)
+          (reduce /prim (car xs) (cdr xs))
+          (/prim 1 (car xs)))
+        1))))
+
+; (def (range from to step)
+;   (if (< from to)
+;     (cons from (range (+ from step) to step))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+; (range 0 10 1)
