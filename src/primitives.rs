@@ -48,5 +48,27 @@ pub fn div(args: &Value) -> Result<Value> {
 
 pub fn eq(args: &Value) -> Result<Value> {
     args::arity(args, 2)?;
-    todo!()
+    if cast::car(args)? == cast::cadr(args)? {
+        Ok(Value::sym("true".to_string()))
+    } else {
+        Ok(Value::Nil)
+    }
+}
+
+pub fn lt(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
+    if cast::car(args)? < cast::cadr(args)? {
+        Ok(Value::sym("true".to_string()))
+    } else {
+        Ok(Value::Nil)
+    }
+}
+
+pub fn lte(args: &Value) -> Result<Value> {
+    args::arity(args, 2)?;
+    if cast::car(args)? <= cast::cadr(args)? {
+        Ok(Value::sym("true".to_string()))
+    } else {
+        Ok(Value::Nil)
+    }
 }

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
+use std::{cell::RefCell, cmp::Ordering, collections::HashMap, fmt, rc::Rc};
 
 #[derive(Debug)]
 pub struct Closure {
@@ -7,7 +7,19 @@ pub struct Closure {
     pub env: Env,
 }
 
-#[derive(Debug, Clone)]
+impl PartialEq for Closure {
+    fn eq(&self, _: &Self) -> bool {
+        false
+    }
+}
+
+impl PartialOrd for Closure {
+    fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
+        None
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Primitive {
     Cons,
     Car,
@@ -17,18 +29,20 @@ pub enum Primitive {
     Sub,
     Div,
     Eq,
+    Lt,
+    Lte,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Pair(Value, Value);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Fn {
     Closure(Rc<Closure>),
     Primitive(Primitive),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
     Int(i32),
@@ -42,6 +56,7 @@ impl Value {
         Value::Pair(Rc::new(Pair(x, y)))
     }
 
+    // TODO find all static symbol definitions and refer to the same one.
     pub fn sym(s: String) -> Value {
         Value::Sym(Rc::new(s))
     }
@@ -123,15 +138,41 @@ impl Env {
     pub fn prelude() -> Env {
         Env(Rc::new(RefCell::new(EnvData {
             frame: vec![
-                ("nil".to_string(), Value::Nil),
-                ("cons".to_string(), Value::primitive(Primitive::Cons)),
-                ("car".to_string(), Value::primitive(Primitive::Car)),
-                ("cdr".to_string(), Value::primitive(Primitive::Cdr)),
-                ("+".to_string(), Value::primitive(Primitive::Add)),
-                ("*".to_string(), Value::primitive(Primitive::Mul)),
-                ("-".to_string(), Value::primitive(Primitive::Sub)),
-                ("/".to_string(), Value::primitive(Primitive::Div)),
-                ("=".to_string(), Value::primitive(Primitive::Eq)),
+                ("primitive/nil".to_string(), Value::Nil),
+                (
+                    "primitive/cons".to_string(),
+                    Value::primitive(Primitive::Cons),
+                ),
+                (
+                    "primitive/car".to_string(),
+                    Value::primitive(Primitive::Car),
+                ),
+                (
+                    "primitive/cdr".to_string(),
+                    Value::primitive(Primitive::Cdr),
+                ),
+                (
+                    "primitive/add".to_string(),
+                    Value::primitive(Primitive::Add),
+                ),
+                (
+                    "primitive/mul".to_string(),
+                    Value::primitive(Primitive::Mul),
+                ),
+                (
+                    "primitive/sub".to_string(),
+                    Value::primitive(Primitive::Sub),
+                ),
+                (
+                    "primitive/div".to_string(),
+                    Value::primitive(Primitive::Div),
+                ),
+                ("primitive/eq".to_string(), Value::primitive(Primitive::Eq)),
+                ("primitive/lt".to_string(), Value::primitive(Primitive::Lt)),
+                (
+                    "primitive/lte".to_string(),
+                    Value::primitive(Primitive::Lte),
+                ),
             ]
             .into_iter()
             .collect(),

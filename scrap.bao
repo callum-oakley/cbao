@@ -1,10 +1,37 @@
-(def (list . xs)
-  xs)
+(def nil primitive/nil)
+(def cons primitive/cons)
+(def car primitive/car)
+(def cdr primitive/cdr)
+
+(def (list . xs) xs)
 
 (def (reduce f acc xs)
   (if xs
     (reduce f (f acc (car xs)) (cdr xs))
     acc))
+
+(def (+ . xs)
+  (reduce primitive/add 0 xs))
+
+(def (* . xs)
+  (reduce primitive/mul 1 xs))
+
+(def (- . xs)
+  (if xs
+    (if (cdr xs)
+      (reduce primitive/sub (car xs) (cdr xs))
+      (primitive/sub 0 (car xs)))
+    0))
+
+(def (/ . xs)
+  (if xs
+    (if (cdr xs)
+      (reduce primitive/div (car xs) (cdr xs))
+      (primitive/div 1 (car xs)))
+    1))
+
+(def (count xs)
+  (reduce (fn (c _) (+ c 1)) 0 xs))
 
 (def (reduce* f acc xs)
   (if xs
@@ -17,18 +44,12 @@
 (def (filter f xs)
   (reduce* (fn (x acc) (if (f x) (cons x acc) acc)) nil xs))
 
-(def (reverse xs)
-  (reduce cons nil xs))
-
 (def (cat . xs)
   (def (cat-2 xs ys)
     (if xs
       (cons (car xs) (cat (cdr xs) ys))
       ys))
   (reduce cat-2 nil xs))
-
-(defmacro (do . body)
-  `((fn () ~@body)))
 
 (defmacro (and x . xs)
   (if xs
@@ -43,49 +64,48 @@
 (def (not x)
   (if x nil 'true))
 
+(def (take n xs)
+  (if (and (primitive/lt 0 n) xs)
+    (cons (car xs) (take (- n 1) (cdr xs)))))
+
+(def (drop n xs)
+  (if (and (primitive/lt 0 n) xs)
+    (drop (- n 1) (cdr xs))
+    xs))
+
 (def (chunks n xs)
   (if xs
     (cons (take n xs) (chunks n (drop n xs)))))
 
-;; (defmacro (let bindings . body)
-;;   `(do
-;;      ~@(map (fn ((k v)) (list 'def k v)) (chunks 2 bindings))
-;;      ~@body))
+(def (windows n xs)
+  (def (loop i xs)
+    (if (primitive/lte 0 i)
+      (cons (take n xs) (loop (- i 1) (cdr xs)))))
+  (loop (- (count xs) n) xs))
 
-;; Primitive + - / * are only defined for the arity-2 case
+(def (= . xs)
+  (all (fn ((x y)) (primitive/eq x y)) (windows 2 xs)))
 
-(def +
-  (do
-    (def +prim +)
-    (fn xs (reduce +prim 0 xs))))
+(def (< . xs)
+  (all (fn ((x y)) (primitive/lt x y)) (windows 2 xs)))
 
-(def *
-  (do
-    (def *prim *)
-    (fn xs (reduce *prim 1 xs))))
+(def (<=. xs)
+  (all (fn ((x y)) (primitive/lte x y)) (windows 2 xs)))
 
-(def -
-  (do (def -prim -)
-    (fn xs
-      (if xs
-        (if (cdr xs)
-          (reduce -prim (car xs) (cdr xs))
-          (-prim 0 (car xs)))
-        0))))
+(def (range start finish)
+  (if (< start finish)
+    (cons start (range (+ start 1) finish))))
 
-(def /
-  (do (def /prim /)
-    (fn xs
-      (if xs
-        (if (cdr xs)
-          (reduce /prim (car xs) (cdr xs))
-          (/prim 1 (car xs)))
-        1))))
+(def (all f xs)
+  (if xs
+    (and (f (car xs)) (all f (cdr xs)))
+    'true))
 
-; (def (range from to step)
-;   (if (< from to)
-;     (cons from (range (+ from step) to step))))
+(def (any f xs)
+  (if xs
+    (or (f (car xs)) (any f (cdr xs)))
+    'false))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; (range 0 10 1)
+(windows 3 (range 0 10))

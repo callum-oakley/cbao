@@ -71,6 +71,8 @@ fn apply(function: &Value, args: &Value) -> Result<Value> {
             Primitive::Sub => primitives::sub(args),
             Primitive::Div => primitives::div(args),
             Primitive::Eq => primitives::eq(args),
+            Primitive::Lt => primitives::lt(args),
+            Primitive::Lte => primitives::lte(args),
         },
         _ => Err(Error::cast(function, "a fn")),
     }
@@ -92,10 +94,18 @@ fn eval_def(args: &Value, env: &Env) -> Result<Value> {
             cast::sym(pair.car())?.to_string(),
             eval_fn(pair.cdr(), cast::cdr(args)?, env)?,
         ),
-        v => env.set(
-            cast::sym(v)?.to_string(),
-            eval(cast::cadr(args)?.clone(), env)?,
-        ),
+        v => {
+            let mut body = cast::cdr(args)?;
+            let internal_env = env.extend(HashMap::new());
+            while !cast::cdr(body)?.is_nil() {
+                eval(cast::car(body)?.clone(), &internal_env)?;
+                body = cast::cdr(body)?;
+            }
+            env.set(
+                cast::sym(v)?.to_string(),
+                eval(cast::car(body)?.clone(), &internal_env)?,
+            )
+        }
     };
     Ok(Value::Nil)
 }
