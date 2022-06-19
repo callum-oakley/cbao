@@ -42,11 +42,6 @@ bool values_equal(Value a, Value b) {
         case VAL_NIL: return true;
         case VAL_BOOL: return AS_BOOL(a) == AS_BOOL(b);
         case VAL_NUMBER: return AS_NUMBER(a) == AS_NUMBER(b);
-        case VAL_OBJ: {
-            ObjString* a_s = AS_STRING(a);
-            ObjString* b_s = AS_STRING(b);
-            return a_s->length == b_s->length &&
-                memcmp(a_s->chars, b_s->chars, a_s->length) == 0;
-        }
+        case VAL_OBJ: return AS_OBJ(a) == AS_OBJ(b);
     }
 }
