@@ -103,8 +103,9 @@ static void end_compiler() {
 #endif
 }
 
-static bool is_symbol(const char* symbol) {
-    return strncmp(parser.previous.start, symbol, parser.previous.length) == 0;
+static bool is_symbol(const char* symbol, int length) {
+    return parser.previous.length == length &&
+        memcmp(parser.previous.start, symbol, length) == 0;
 }
 
 static void expression();
@@ -112,14 +113,14 @@ static void expression();
 static void list() {
     // hack that handles primitive ops only
     advance();
-    if (is_symbol("not")) {
+    if (is_symbol("not", 3)) {
         expression();
         emit_byte(OP_NOT);
-    } else if (is_symbol("+")) {
+    } else if (is_symbol("+", 1)) {
         expression();
         expression();
         emit_byte(OP_ADD);
-    } else if (is_symbol("-")) {
+    } else if (is_symbol("-", 1)) {
         expression();
         if (parser.current.type == TOKEN_RIGHT_PAREN) {
             emit_byte(OP_NEGATE);
@@ -127,35 +128,35 @@ static void list() {
             expression();
             emit_byte(OP_SUBTRACT);
         }
-    } else if (is_symbol("*")) {
+    } else if (is_symbol("*", 1)) {
         expression();
         expression();
         emit_byte(OP_MULTIPLY);
-    } else if (is_symbol("/")) {
+    } else if (is_symbol("/", 1)) {
         expression();
         expression();
         emit_byte(OP_DIVIDE);
-    } else if (is_symbol("=")) {
+    } else if (is_symbol("=", 1)) {
         expression();
         expression();
         emit_byte(OP_EQUAL);
-    } else if (is_symbol("not=")) {
+    } else if (is_symbol("not=", 4)) {
         expression();
         expression();
         emit_byte(OP_NOT_EQUAL);
-    } else if (is_symbol("<")) {
+    } else if (is_symbol("<", 1)) {
         expression();
         expression();
         emit_byte(OP_LESS);
-    } else if (is_symbol(">")) {
+    } else if (is_symbol(">", 1)) {
         expression();
         expression();
         emit_byte(OP_GREATER);
-    } else if (is_symbol("<=")) {
+    } else if (is_symbol("<=", 2)) {
         expression();
         expression();
         emit_byte(OP_LESS_EQUAL);
-    } else if (is_symbol(">=")) {
+    } else if (is_symbol(">=", 2)) {
         expression();
         expression();
         emit_byte(OP_GREATER_EQUAL);
@@ -174,11 +175,11 @@ static void string() {
 }
 
 static void symbol() {
-    if (is_symbol("nil")) {
+    if (is_symbol("nil", 3)) {
         emit_byte(OP_NIL);
-    } else if (is_symbol("true")) {
+    } else if (is_symbol("true", 4)) {
         emit_byte(OP_TRUE);
-    } else if (is_symbol("false")) {
+    } else if (is_symbol("false", 5)) {
         emit_byte(OP_FALSE);
     } else {
         // TODO
@@ -192,6 +193,7 @@ static void expression() {
         case TOKEN_NUMBER: return number();
         case TOKEN_LEFT_PAREN: return list();
         case TOKEN_SYMBOL: return symbol();
+        case TOKEN_STRING: return string();
         default: error("Unexpected token.");
     }
 }

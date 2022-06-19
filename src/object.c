@@ -12,6 +12,9 @@
 static Obj* allocate_object(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
   object->type = type;
+
+  object->next = vm.objects;
+  vm.objects = object;
   return object;
 }
 
@@ -27,4 +30,12 @@ ObjString* copy_string(const char* chars, int length) {
     memcpy(heap_chars, chars, length);
     heap_chars[length] = '\0';
     return allocate_string(heap_chars, length);
+}
+
+void print_object(Value value) {
+    switch (OBJ_TYPE(value)) {
+        case OBJ_STRING:
+            printf("\"%s\"", AS_CSTRING(value));
+            break;
+    }
 }
