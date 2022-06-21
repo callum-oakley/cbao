@@ -115,7 +115,14 @@ static InterpretResult run() {
                 }
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
-            case OP_RETURN: print_value(pop()); printf("\n"); return INTERPRET_OK;
+            case OP_POP: pop(); break;
+            case OP_GET_VARIABLE: {
+                uint8_t slot = READ_BYTE();
+                push(vm.stack[slot]);
+                break;
+            }
+            case OP_PRINT: print_value(pop()); printf("\n"); break;
+            case OP_RETURN: return INTERPRET_OK;
         }
     }
 

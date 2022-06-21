@@ -21,6 +21,9 @@ typedef enum {
     OP_GREATER_EQUAL,
     OP_NEGATE,
     OP_NOT,
+    OP_POP,
+    OP_GET_VARIABLE,
+    OP_PRINT,
     OP_RETURN,
 } OpCode;
 

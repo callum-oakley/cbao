@@ -24,6 +24,12 @@ static int simple_instruction(const char* name, int offset) {
     return offset + 1;
 }
 
+static int byte_instruction(const char* name, Chunk* chunk, int offset) {
+    uint8_t slot = chunk->code[offset + 1];
+    printf("%-16s %4d\n", name, slot);
+    return offset + 2;
+}
+
 int disassemble_instruction(Chunk* chunk, int offset) {
     printf("%04d ", offset);
     if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
@@ -49,7 +55,10 @@ int disassemble_instruction(Chunk* chunk, int offset) {
         case OP_LESS_EQUAL: return simple_instruction("OP_LESS_EQUAL", offset);
         case OP_GREATER_EQUAL: return simple_instruction("OP_GREATER_EQUAL", offset);
         case OP_NOT: return simple_instruction("OP_NOT", offset);
+        case OP_POP: return simple_instruction("OP_POP", offset);
+        case OP_GET_VARIABLE: return byte_instruction("OP_GET_VARIABLE", chunk, offset);
         case OP_NEGATE: return simple_instruction("OP_NEGATE", offset);
+        case OP_PRINT: return simple_instruction("OP_PRINT", offset);
         case OP_RETURN: return simple_instruction("OP_RETURN", offset);
         default:
             printf("Unknown opcode %d\n", instruction);

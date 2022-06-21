@@ -16,7 +16,19 @@ typedef struct {
     bool error;
 } Parser;
 
+typedef struct {
+    Token name;
+    int depth;
+} Variable;
+
+typedef struct {
+    Variable variables[UINT8_COUNT];
+    int variable_count;
+    int scope_depth;
+} Compiler;
+
 Parser parser;
+Compiler* current = NULL;
 Chunk* compiling_chunk;
 
 static Chunk* current_chunk() {
@@ -94,6 +106,12 @@ static void emit_constant(Value value) {
     emit_bytes(OP_CONSTANT, make_constant(value));
 }
 
+static void init_compiler(Compiler* compiler) {
+    compiler->variable_count = 0;
+    compiler->scope_depth = 0;
+    current = compiler;
+}
+
 static void end_compiler() {
     emit_return();
 #ifdef DEBUG_PRINT_CODE
@@ -103,9 +121,40 @@ static void end_compiler() {
 #endif
 }
 
+static void begin_scope() {
+    current->scope_depth++;
+}
+
+static void end_scope() {
+    current->scope_depth--;
+    while (
+        current->variable_count > 0 &&
+        current->variables[current->variable_count - 1].depth > current->scope_depth
+    ) {
+        emit_byte(OP_POP);
+        current->variable_count--;
+    }
+}
+
 static bool is_symbol(const char* symbol, int length) {
     return parser.previous.length == length &&
         memcmp(parser.previous.start, symbol, length) == 0;
+}
+
+static bool identifiers_equal(Token* a, Token* b) {
+    return a->length == b->length &&
+        memcmp(a->start, b->start, a->length) == 0;
+}
+
+static void add_variable(Token name) {
+    if (current->variable_count == UINT8_COUNT) {
+        error("Too many variables.");
+        return;
+    }
+
+    Variable* variable = &current->variables[current->variable_count++];
+    variable->name = name;
+    variable->depth = current->scope_depth;
 }
 
 static void expression();
@@ -160,6 +209,16 @@ static void list() {
         expression();
         expression();
         emit_byte(OP_GREATER_EQUAL);
+    } else if (is_symbol("def", 3)) {
+        advance();
+        Token name = parser.previous;
+        expression();
+        add_variable(name);
+        emit_byte(OP_NIL);
+    } else if (is_symbol("print", 5)) {
+        expression();
+        emit_byte(OP_PRINT);
+        emit_byte(OP_NIL);
     } else {
         // TODO
     }
@@ -174,6 +233,17 @@ static void string() {
     emit_constant(OBJ_VAL(copy_string(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
+static int resolve_variable(Compiler* compiler, Token* name) {
+    for (int i = compiler->variable_count - 1; i >= 0; i--) {
+        Variable* variable = &compiler->variables[i];
+        if (identifiers_equal(name, &variable->name)) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 static void symbol() {
     if (is_symbol("nil", 3)) {
         emit_byte(OP_NIL);
@@ -182,7 +252,12 @@ static void symbol() {
     } else if (is_symbol("false", 5)) {
         emit_byte(OP_FALSE);
     } else {
-        // TODO
+        int slot = resolve_variable(current, &parser.previous);
+        if (slot == -1) {
+            error("Can't resolve variable.");
+        } else {
+            emit_bytes(OP_GET_VARIABLE, (uint8_t)slot);
+        }
     }
 }
 
@@ -200,11 +275,15 @@ static void expression() {
 
 bool compile(const char* source, Chunk* chunk) {
     init_scanner(source);
+    Compiler compiler;
+    init_compiler(&compiler);
     compiling_chunk = chunk;
     parser.error = false;
     advance();
-    expression();
-    consume(TOKEN_EOF, "Expect end of expression.");
+    while (parser.current.type != TOKEN_EOF) {
+        expression();
+        emit_byte(OP_POP);
+    }
     end_compiler();
     return !parser.error;
 }
