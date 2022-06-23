@@ -119,7 +119,6 @@ Token scan_token() {
     switch (c) {
         case '(': return make_token(TOKEN_LEFT_PAREN);
         case ')': return make_token(TOKEN_RIGHT_PAREN);
-        case '.': return make_token(TOKEN_DOT);
         case '"': return string();
         default: return symbol();
     }

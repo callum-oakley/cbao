@@ -21,6 +21,9 @@ typedef struct {
     int depth;
 } Variable;
 
+// TODO I think for bao scope_depth is equivalent to variable_count, since let
+// always binds a single variable and introduces a new scope. Maybe this isn't
+// the case for functions though?
 typedef struct {
     Variable variables[UINT8_COUNT];
     int variable_count;
@@ -131,7 +134,7 @@ static void end_scope() {
         current->variable_count > 0 &&
         current->variables[current->variable_count - 1].depth > current->scope_depth
     ) {
-        emit_byte(OP_POP);
+        emit_byte(OP_PUSH_DOWN);
         current->variable_count--;
     }
 }
@@ -209,16 +212,9 @@ static void list() {
         expression();
         expression();
         emit_byte(OP_GREATER_EQUAL);
-    } else if (is_symbol("def", 3)) {
-        advance();
-        Token name = parser.previous;
-        expression();
-        add_variable(name);
-        emit_byte(OP_NIL);
     } else if (is_symbol("print", 5)) {
         expression();
         emit_byte(OP_PRINT);
-        emit_byte(OP_NIL);
     } else {
         // TODO
     }
@@ -251,6 +247,22 @@ static void symbol() {
         emit_byte(OP_TRUE);
     } else if (is_symbol("false", 5)) {
         emit_byte(OP_FALSE);
+    } else if (is_symbol("let", 3)) {
+        advance();
+        Token name = parser.previous;
+        expression();
+        begin_scope();
+        // TODO Do we need to declare and then initialize like in the book?
+        // Defining variables in terms of their previous value is fine for
+        // non-functions, but might be a pain when we want to write recursive
+        // functions.
+        add_variable(name);
+        expression();
+        end_scope();
+    } else if (is_symbol("do", 2)) {
+        expression();
+        emit_byte(OP_POP);
+        expression();
     } else {
         int slot = resolve_variable(current, &parser.previous);
         if (slot == -1) {
@@ -280,10 +292,11 @@ bool compile(const char* source, Chunk* chunk) {
     compiling_chunk = chunk;
     parser.error = false;
     advance();
-    while (parser.current.type != TOKEN_EOF) {
-        expression();
-        emit_byte(OP_POP);
+    expression();
+    if (parser.current.type != TOKEN_EOF) {
+        error_at_current("Unexpected token.");
     }
+    emit_byte(OP_PRINT);
     end_compiler();
     return !parser.error;
 }

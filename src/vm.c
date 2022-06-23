@@ -116,12 +116,18 @@ static InterpretResult run() {
                 push(NUMBER_VAL(-AS_NUMBER(pop())));
                 break;
             case OP_POP: pop(); break;
+            case OP_PUSH_DOWN: {
+                Value a = pop();
+                pop();
+                push(a);
+                break;
+            }
             case OP_GET_VARIABLE: {
                 uint8_t slot = READ_BYTE();
                 push(vm.stack[slot]);
                 break;
             }
-            case OP_PRINT: print_value(pop()); printf("\n"); break;
+            case OP_PRINT: print_value(pop()); printf("\n"); push(NIL_VAL); break;
             case OP_RETURN: return INTERPRET_OK;
         }
     }

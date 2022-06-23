@@ -22,6 +22,7 @@ typedef enum {
     OP_NEGATE,
     OP_NOT,
     OP_POP,
+    OP_PUSH_DOWN,
     OP_GET_VARIABLE,
     OP_PRINT,
     OP_RETURN,
