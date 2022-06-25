@@ -91,6 +91,25 @@ static void emit_bytes(uint8_t byte0, uint8_t byte1) {
     emit_byte(byte1);
 }
 
+static int emit_jump(uint8_t jump) {
+    emit_byte(jump);
+    emit_byte(0xff);
+    emit_byte(0xff);
+    return current_chunk()->count - 2;
+}
+
+static void patch_jump(int offset) {
+    // -2 to adjust for the bytecode for the jump offset itself.
+    int jump = current_chunk()->count - offset - 2;
+
+    if (jump > UINT16_MAX) {
+        error("Too much code to jump over.");
+    }
+
+    current_chunk()->code[offset] = (jump >> 8) & 0xff;
+    current_chunk()->code[offset + 1] = jump & 0xff;
+}
+
 static void emit_return() {
     emit_byte(OP_RETURN);
 }
@@ -263,6 +282,24 @@ static void symbol() {
         expression();
         emit_byte(OP_POP);
         expression();
+    } else if (is_symbol("if", 2)) {
+        expression();
+        int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+        expression();
+        int else_jump = emit_jump(OP_JUMP);
+        patch_jump(then_jump);
+        expression();
+        patch_jump(else_jump);
+    } else if (is_symbol("and", 3)) {
+        expression();
+        int jump = emit_jump(OP_JUMP_IF_FALSE_ELSE_POP);
+        expression();
+        patch_jump(jump);
+    } else if (is_symbol("or", 2)) {
+        expression();
+        int jump = emit_jump(OP_JUMP_IF_TRUE_ELSE_POP);
+        expression();
+        patch_jump(jump);
     } else {
         int slot = resolve_variable(current, &parser.previous);
         if (slot == -1) {

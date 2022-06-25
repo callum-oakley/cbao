@@ -25,6 +25,10 @@ typedef enum {
     OP_PUSH_DOWN,
     OP_GET_VARIABLE,
     OP_PRINT,
+    OP_JUMP,
+    OP_JUMP_IF_FALSE,
+    OP_JUMP_IF_FALSE_ELSE_POP,
+    OP_JUMP_IF_TRUE_ELSE_POP,
     OP_RETURN,
 } OpCode;
 
