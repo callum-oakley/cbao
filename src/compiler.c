@@ -25,6 +25,7 @@ typedef struct {
 // always binds a single variable and introduces a new scope. Maybe this isn't
 // the case for functions though?
 typedef struct {
+    ObjFunction* function;
     Variable variables[UINT8_COUNT];
     int variable_count;
     int scope_depth;
@@ -32,10 +33,9 @@ typedef struct {
 
 Parser parser;
 Compiler* current = NULL;
-Chunk* compiling_chunk;
 
 static Chunk* current_chunk() {
-    return compiling_chunk;
+    return &current->function->chunk;
 }
 
 static void error_at(Token* token, const char* message) {
@@ -129,18 +129,32 @@ static void emit_constant(Value value) {
 }
 
 static void init_compiler(Compiler* compiler) {
+    compiler->function = NULL;
     compiler->variable_count = 0;
     compiler->scope_depth = 0;
+    compiler->function = new_function();
     current = compiler;
+
+    Variable* variable = &current->variables[current->variable_count++];
+    variable->depth = 0;
+    variable->name.start = "";
+    variable->name.length = 0;
 }
 
-static void end_compiler() {
+static ObjFunction* end_compiler() {
     emit_return();
+    ObjFunction* function = current->function;
+
 #ifdef DEBUG_PRINT_CODE
     if (!parser.error) {
-        disassemble_chunk(current_chunk(), "code");
+        disassemble_chunk(
+            current_chunk(),
+            function->name != NULL ? function->name->chars : "<anon>",
+        );
     }
 #endif
+
+    return function;
 }
 
 static void begin_scope() {
@@ -322,18 +336,17 @@ static void expression() {
     }
 }
 
-bool compile(const char* source, Chunk* chunk) {
+ObjFunction* compile(const char* source) {
     init_scanner(source);
     Compiler compiler;
     init_compiler(&compiler);
-    compiling_chunk = chunk;
+
     parser.error = false;
     advance();
     expression();
     if (parser.current.type != TOKEN_EOF) {
         error_at_current("Unexpected token.");
     }
-    emit_byte(OP_PRINT);
-    end_compiler();
-    return !parser.error;
+    ObjFunction* function = end_compiler();
+    return parser.error ? NULL : function;
 }
